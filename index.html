@@ -234,9 +234,9 @@ const CONFIG = {
   secret: "kitaku-2026",
   teacherPinHash: 189797738,       // 강사 화면 PIN의 hashStr 값 (초기 PIN 7350). 바꾸려면 콘솔에서 hashStr("새PIN") 실행 후 여기 붙여넣기
   classes: { "토일반": [], "화목반": [] },   // 반 이름 (학생 이름은 본인이 입력)
-  form: {                          // 구글 폼 연결 후 채움 (비어 있으면 이 기기에만 저장)
-    url: "",
-    fields: { name:"", cls:"", set:"", first:"", time:"", wrong:"" }
+  form: {                          // 구글 폼 「帰宅クイズ 기록」 (비우면 이 기기에만 저장)
+    url: "https://docs.google.com/forms/d/e/1FAIpQLSemiDuYKbrHDiZTOfmAiOC2cex5Eo5zgWYsxRKfBBTARWng9Q/formResponse",
+    fields: { name:"entry.1954971135", cls:"entry.1556659008", set:"entry.1257529705", first:"entry.2027853110", time:"entry.761713755", wrong:"entry.428638031", rounds:"entry.1047549204" }
   }
 };
 
@@ -647,6 +647,7 @@ function submit(rec){
     fd.append(f.fields.name, rec.name); fd.append(f.fields.cls, rec.cls); fd.append(f.fields.set, rec.setName);
     fd.append(f.fields.first, rec.first+"/"+rec.n); fd.append(f.fields.time, Math.round(rec.elapsed/1000));
     fd.append(f.fields.wrong, rec.wrong.map(w=>w.id+" "+w.name).join(", "));
+    if(f.fields.rounds) fd.append(f.fields.rounds, rec.rounds);
     fetch(f.url,{method:"POST",mode:"no-cors",body:fd}).catch(()=>{});
     return true;
   }catch(e){ return false; }

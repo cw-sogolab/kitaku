@@ -8,7 +8,7 @@
 - **용도**: 종합과목 실전반(토일반·화목반) 수업 끝 10~15분. 학생이 QR로 들어와 **오늘 세트 20문항을 전부 맞힐 때까지** 풀고, 퇴실증(帰宅券) 화면을 문 앞에서 보여주고 나간다.
 - **배포**: GitHub Pages. 사이트 **https://cw-sogolab.github.io/kitaku/** · 저장소 `github.com/cw-sogolab/kitaku` (main 브랜치 루트). 이 폴더(`~/ilgong/kitaku-quiz`)가 git 작업본이고, push하면 1~2분 뒤 반영된다. 원격 주소에 토큰이 들어 있으니 `.git/config`를 공유하지 말 것.
 - **강사 화면**: `…/kitaku/#teacher` 로 들어가 PIN 입력 (초기 PIN 7350, `CONFIG.teacherPinHash`에 hashStr 값만 저장). 학생 화면에는 강사 버튼이 보이지 않는다. 정적 사이트라 소스를 뜯으면 뚫리는 수준의 잠금이다 — 오늘 암호(dailyCode)를 슬쩍 못 보게 하는 용도.
-- **결과 수집**: 구글 폼 → 구글 시트 (폼 URL·필드 ID를 `index.html`의 `CONFIG.form`에 넣으면 자동 전송. 비어 있으면 학생 폰에만 저장).
+- **결과 수집**: 구글 폼 「帰宅クイズ 기록」(단답형 7문항: 이름·반·범위·첫 시도 정답·걸린 시간(초)·틀린 문항·시도 횟수) → 연결된 구글 시트. `CONFIG.form`에 formResponse URL과 entry ID 연결 완료(2026-09-26). 폼 질문을 추가·삭제하면 entry ID가 바뀌므로 다시 맞춰야 한다. 전송은 no-cors라 성공 여부를 알 수 없음 — 시트에서 확인. 폼은 「게시」 상태, 응답자 「링크가 있는 모든 사용자」여야 한다.
 - **기획서**: `PLAN.md` (결정사항·일정·화면 구성). 규칙이 바뀌면 PLAN.md와 이 파일을 같이 고친다.
 
 ## 2. 파일 구성
@@ -75,7 +75,7 @@ kitaku-quiz/
 - **문항 데이터 다시 만들기**: 자료집·연표DB가 바뀌면 `build/build_data.py` 실행 → `data.js` 교체. (자료집 docx의 후리가나(ruby)는 python-docx `.text`가 못 읽으므로 `w:rubyBase`만 읽는 `celltext()` 사용)
 - **개념 문항 추가**: 새 회차 기출이 DB에 들어오면 `build/concept/SPEC.md` 규격으로 회차 json 작성 → `build_data.py`가 합침.
 - **명단·반 바꾸기**: `CONFIG.classes`의 키만 반 이름으로 쓰인다 (값은 안 씀).
-- **구글 폼 연결**: `CONFIG.form.url`에 `formResponse` URL, `fields`에 `entry.xxxxx` ID.
+- **구글 폼 entry ID 다시 뽑기**: 게시된 viewform 페이지에서 `FB_PUBLIC_LOAD_DATA_[1][1]` 의 각 항목 `[4][0][0]`이 entry ID.
 - **배포(커밋·푸시)**: 이 폴더에서 `git add -A && git commit && git push`. 원격·토큰은 설정돼 있음. 「커밋해줘」 한 마디면 됨.
 - **강사 PIN 바꾸기**: 사이트 콘솔에서 `hashStr("새PIN")` → 나온 숫자를 `CONFIG.teacherPinHash`에.
 - **검수 요청**: 「CLAUDE.md 기준으로 검수해줘」 → 3장 절대 규칙 순서로 점검.
