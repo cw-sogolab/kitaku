@@ -146,6 +146,7 @@ def build_world(xlsx):
         if not d['사건ID']: continue
         e = dict(id=d['사건ID'], y=d['연도_채택'], eff=d['연도_발효'], ko=d['사건명'].strip(), ja=(d['사건명_일'] or '').strip(), f=d['분야'],
                  t=(d['유형'] or '').replace('・', '·'), g=d['등급'], core=(d['핵심 한 줄'] or '').strip(), c=d['관련국'] or '')
+        if str(d.get('일본연표') or '').strip().upper() == 'O': e['jp'] = 1   # 마스터DB 일본연표 표시 → 통합본에서 세계연표 쪽 중복 출제 방지
         m2 = re.match(r'^(\([A-Za-z0-9 .\-/]+\))\s*(.*)$', e['ja'])
         if m2: e['ko'] = e['ko']+' '+m2.group(1); e['ja'] = m2.group(2)
         if e['y'] < 2020 and not YEAR_IN_NAME.search(e['ko']+e['ja']): out.append(e)

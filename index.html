@@ -425,7 +425,7 @@ const BUILD = {
     const idx = [0,1,2,3]; const ord = shuffle(idx, r);
     const choices = ord.map(i=>({main:x.c[i]}));
     return {tag:x.subj+" · 개념", prompt:`<span class="qtext">${esc(x.q)}</span>`, choices, answer: ord.indexOf(x.a),
-      explain:`${esc(x.e)}<br><span class="muted">키워드: ${x.kw.map(esc).join(" · ")} · 출제 근거 ${esc(x.src)}</span>`};
+      explain:`${esc(x.e)}<br><span class="muted">키워드: ${x.kw.map(esc).join(" · ")}</span>`};
   }
 };
 function chronoExplain(list, key){
@@ -461,7 +461,7 @@ function planComposite(set, n, seed){
     const subs = part.sets.map(setById);
     for(let k=0;k<q[pi];k++){
       const sub = weightedSample(subs, s=>s.pool().length, 1, r)[0];
-      const cand = sub.pool().filter(it=>!used.has(itemId(sub.id,it)));
+      const cand = sub.pool().filter(it=>!used.has(itemId(sub.id,it)) && !(sub.id.startsWith("w-") && it.jp));   // 통합본: 일본연표에 있는 사건은 세계연표 쪽에서 빼서 중복 방지
       const pl = planSet({...sub, pool:()=>cand}, 1, Math.floor(r()*1e9))[0];
       if(!pl) continue;
       used.add(itemId(sub.id, pl.it)); out.push({...pl, sid:sub.id});
@@ -562,7 +562,7 @@ function renderPractice(){
       <div class="stk s1">✎</div><div class="stk s2">☆</div>
       <span class="eyebrow">혼자 연습 · ${korDateShort()}</span>
       <h1>${esc(set.name)}</h1>
-      <div class="meta"><span><b>${prac.n}</b>문항</span><span>틀린 문제는 다시 나와요</span><span>기록은 이 폰에만 남아요</span></div>
+      <div class="meta"><span><b>${prac.n}</b>문항</span><span>틀린 문제는 다시 나와요</span><span>기록은 「연습」으로 시트에 남아요</span></div>
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><label for="psel">범위</label>
@@ -666,7 +666,6 @@ function choose(i){
   if(ok){ S.cleared.add(idx); S.streak[idx]=0; if(S.round===1) S.firstOk.add(idx); S.locked=false; }
   else { S.streak[idx]=(S.streak[idx]||0)+1; S.next.push(idx); if(S.round===1) S.firstWrong.push(idx); S.locked = S.streak[idx]>=2; }
   render();
-  if(ok) advTimer=setTimeout(advance, q.order?2200:1500);
 }
 function advance(){
   clearTimeout(advTimer); clearInterval(lockTimer);
@@ -694,12 +693,11 @@ function finish(){
   const hist=store.get(histKey, []);
   S.prev = hist.length? hist[hist.length-1] : null;
   hist.push({date, first, n:S.n}); store.set(histKey, hist.slice(-20));
-  if(S.practice){ S.sent=false; go("result"); return; }   // 연습: 시트 전송·강사 기록 없음
-  const rec = { ts:new Date().toISOString(), hm:fmtTime(new Date()).slice(0,5), date, cls:S.cls, name:S.name, set:S.set.id, setName:setLabel(S.set), n:S.n, first,
+  const rec = { ts:new Date().toISOString(), hm:fmtTime(new Date()).slice(0,5), date, cls:S.cls, name:S.name, set:S.set.id, setName:(S.practice?"연습 · ":"")+setLabel(S.set), n:S.n, first,
     elapsed:S.endAt-S.startAt, rounds:S.round, wrong:S.firstWrong.map(i=>({id:itemId(S.set.id,S.plans[i].it), name:itemName(S.plans[i].it)})) };
-  const log=store.get("log", []); log.push(rec); store.set("log", log.slice(-500));
+  if(!S.practice){ const log=store.get("log", []); log.push(rec); store.set("log", log.slice(-500)); }
   S.sent = submit(rec);
-  go("ticket");
+  go(S.practice? "result" : "ticket");
 }
 function submit(rec){
   const f=CONFIG.form;
@@ -775,7 +773,7 @@ function renderResult(){
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span class="growth">${growth}</span><span class="muted" style="font-size:12px">${S.round>1? S.round+"번째 시도에 완료":"한 번에 완료!"}</span></div>
       ${S.firstWrong.length? `<div class="field"><span class="lbl">처음에 틀린 것</span><div class="muted" style="font-size:13px;line-height:1.6">${S.firstWrong.map(i=>esc(itemLabel(S.plans[i].it))).join(" · ")}</div></div>`:""}
     </section>
-    <p class="sent">연습 기록은 이 폰에만 남아요. 퇴실증이 아니에요.</p>
+    <p class="sent">${S.sent?"연습 기록이 선생님 시트에 「연습」으로 저장됐어요.":"연습 기록은 이 폰에 저장됐어요."} 퇴실증이 아니에요.</p>
     <button class="btn" id="again-same">같은 범위 한 번 더</button>
     <button class="btn ghost" id="again">다른 범위 고르기</button>
   </div>`;
