@@ -52,6 +52,10 @@ button{font:inherit;color:inherit}
 .wrap{max-width:460px;margin:0 auto;padding-top:18px;display:flex;flex-direction:column;gap:14px}
 .wrap.wide{max-width:980px}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px}
+.prac-res{display:flex;flex-direction:column;gap:12px}
+.prac-res .t-grid{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.prac-tag{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.1em;color:var(--muted);border:1.5px solid var(--line);border-radius:6px;padding:2px 8px}
+.linkbtn{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer;padding:6px}
 .eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--muted)}
 h1,h2,h3{margin:0;text-wrap:balance}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;color:#fff;background:var(--c)}
@@ -421,6 +425,7 @@ function chronoExplain(list, key){
 }
 function itemId(setId, it){ return it.n ? "P"+String(it.n).padStart(2,"0") : it.id; }
 function itemName(it){ return it.n ? it.ja : (it.ko || it.q || it.ja); }
+function itemLabel(it){ const t = it.n ? it.ko : (it.ko || it.q || it.ja); return t.length>42 ? t.slice(0,40)+"…" : t; }
 
 function planSet(set, n, seed){
   if(set.composite) return planComposite(set, n, seed);
@@ -463,16 +468,20 @@ function buildQ(set, plan, seed){
 
 /* ───────── 상태 ───────── */
 const params = new URLSearchParams(location.search);
-let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:"화목반"});
-if(params.get("set")) preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||preset.c};
+let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:"화목반", date:""});
+if(params.get("set")){ preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||preset.c, date:today()}; store.set("preset2", preset); }
+// QR(주소에 set=)로 들어왔거나 오늘 받은 세트가 있으면 수업 모드, 아니면 혼자 연습 모드
+let mode = (params.get("set") || preset.date===today()) ? "class" : "practice";
+let prac = store.get("prac", {set:"all", n:10});
+const home = () => mode==="class" ? "entry" : "practice";
 let S = null;         // 퀴즈 진행 상태
 const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
-let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : "entry";
+let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : home();
 let entry = {cls: params.get("c") || store.get("lastCls", preset.c), name: store.get("lastName", null)};
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
-$("#nav-student").onclick = ()=>{ if(view==="teacher") go(S&&!S.done? "quiz" : "entry"); };
+$("#nav-student").onclick = ()=>{ if(view==="teacher") go(S&&!S.done? "quiz" : home()); };
 $("#nav-teacher").onclick = ()=>go(tUnlocked() ? "teacher" : "pin");
 window.addEventListener("hashchange", ()=>{ if(location.hash==="#teacher") go(tUnlocked() ? "teacher" : "pin"); });
 
@@ -497,7 +506,7 @@ function bindPin(){
   };
   $("#pin-go").onclick=tryPin;
   inp.onkeydown=e=>{ if(e.key==="Enter") tryPin(); };
-  $("#pin-back").onclick=()=>{ history.replaceState(null,"",location.pathname+location.search); go("entry"); };
+  $("#pin-back").onclick=()=>{ history.replaceState(null,"",location.pathname+location.search); go(home()); };
 }
 
 /* ───────── 화면: 입장 ───────── */
@@ -521,22 +530,64 @@ function renderEntry(){
       ${hist.length?`<div class="muted" style="font-size:13px">지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
     <button class="btn" id="start" ${entry.name?"":"disabled"}>${entry.name? "시작하기" : "이름을 먼저 입력하세요"}</button>
+    <div style="text-align:center"><button class="linkbtn" id="to-prac">집에서 혼자 연습하기 →</button></div>
   </div>`;
 }
 function bindEntry(){
+  const tp=$("#to-prac"); if(tp) tp.onclick=()=>{ mode="practice"; go("practice"); };
   document.querySelectorAll("[data-cls]").forEach(b=>b.onclick=()=>{ entry.cls=b.dataset.cls; render(); });
   const ni=$("#name"), st0=$("#start");
   if(ni){ ni.oninput=()=>{ entry.name=ni.value.trim().replace(/\s+/g," ")||null; st0.disabled=!entry.name; st0.textContent=entry.name?"시작하기":"이름을 먼저 입력하세요"; };
           ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(); }; }
-  const st=$("#start"); if(st) st.onclick=startQuiz;
+  const st=$("#start"); if(st) st.onclick=()=>startQuiz(false);
 }
-function startQuiz(){
+
+/* ───────── 화면: 혼자 연습 ───────── */
+function renderPractice(){
+  const set=setById(prac.set), [sn, sc]=SUBJ[set.subj];
+  const hist = entry.name ? store.get("phist."+entry.name+"."+set.id, []) : [];
+  const hasClass = preset.date===today();
+  return `<div class="wrap">
+    <section class="card setcard">
+      <span class="eyebrow">혼자 연습 · ${korDate(new Date())}</span>
+      <div><span class="chip" style="--c:${sc}">${esc(set.group)}</span></div>
+      <h1>${esc(set.name)}</h1>
+      <div class="meta"><span><b>${prac.n}</b>문항</span><span>틀린 문제는 다시 나와요</span><span>기록은 이 폰에만 남아요</span></div>
+    </section>
+    <section class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="field"><label for="psel">범위</label>
+        <select id="psel" class="pick">${[...new Set(SETS.filter(x=>!x.soon).map(x=>x.group))].map(g=>`<optgroup label="${esc(g)}">${SETS.filter(x=>x.group===g&&!x.soon).map(x=>`<option value="${x.id}" ${x.id===set.id?"selected":""}>${esc(x.name)}</option>`).join("")}</optgroup>`).join("")}</select>
+      </div>
+      <div class="field"><span class="lbl">문항 수</span>
+        <div class="seg" role="group" aria-label="문항 수">${[10,20,30].map(n=>`<button data-pn="${n}" aria-pressed="${n===prac.n}">${n}</button>`).join("")}</div>
+      </div>
+      <div class="field"><label for="name">이름</label>
+        <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="이름을 입력하세요" value="${esc(entry.name||"")}">
+      </div>
+      ${hist.length?`<div class="muted" style="font-size:13px">이 범위 지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
+    </section>
+    <button class="btn" id="start" ${entry.name?"":"disabled"}>${entry.name? "연습 시작" : "이름을 먼저 입력하세요"}</button>
+    ${hasClass?`<div style="text-align:center"><button class="linkbtn" id="to-class">오늘 퇴실 퀴즈로 →</button></div>`:`<p class="muted" style="text-align:center;font-size:12px">수업 퇴실 퀴즈는 선생님이 띄운 QR로 들어오세요.</p>`}
+  </div>`;
+}
+function bindPractice(){
+  $("#psel").onchange=e=>{ prac={...prac, set:e.target.value}; store.set("prac", prac); render(); };
+  document.querySelectorAll("[data-pn]").forEach(b=>b.onclick=()=>{ prac={...prac, n:+b.dataset.pn}; store.set("prac", prac); render(); });
+  const ni=$("#name"), st0=$("#start");
+  ni.oninput=()=>{ entry.name=ni.value.trim().replace(/\s+/g," ")||null; st0.disabled=!entry.name; st0.textContent=entry.name?"연습 시작":"이름을 먼저 입력하세요"; };
+  ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(true); };
+  st0.onclick=()=>startQuiz(true);
+  const tc=$("#to-class"); if(tc) tc.onclick=()=>{ mode="class"; go("entry"); };
+}
+
+function startQuiz(practice){
   if(!entry.name) return;
-  store.set("lastName", entry.name); store.set("lastCls", entry.cls);
-  const set=setById(preset.set);
+  store.set("lastName", entry.name); if(!practice) store.set("lastCls", entry.cls);
+  const set=setById(practice? prac.set : preset.set);
+  const nWant = practice? prac.n : preset.n;
   const seed = hashStr(today()+"|"+set.id+"|"+entry.name+"|"+Date.now());
-  const plans = planSet(set, preset.n, seed);
-  S = { set, cls:entry.cls, name:entry.name, n:plans.length, plans, seed,
+  const plans = planSet(set, nWant, seed);
+  S = { set, practice:!!practice, cls: practice? "연습" : entry.cls, name:entry.name, n:plans.length, plans, seed,
         round:1, queue:plans.map((_,i)=>i), pos:0, next:[], cleared:new Set(), firstOk:new Set(), firstWrong:[],
         streak:{}, tries:{}, startAt:Date.now(), done:false, q:null, sel:[] };
   loadQ(); go("quiz");
@@ -629,10 +680,11 @@ function finish(){
   S.done=true; S.endAt=Date.now();
   const date=today();
   const first=S.firstOk.size;
-  const histKey="hist."+S.name+"."+S.set.id;
+  const histKey=(S.practice?"phist.":"hist.")+S.name+"."+S.set.id;
   const hist=store.get(histKey, []);
   S.prev = hist.length? hist[hist.length-1] : null;
   hist.push({date, first, n:S.n}); store.set(histKey, hist.slice(-20));
+  if(S.practice){ S.sent=false; go("result"); return; }   // 연습: 시트 전송·강사 기록 없음
   const rec = { ts:new Date().toISOString(), hm:fmtTime(new Date()).slice(0,5), date, cls:S.cls, name:S.name, set:S.set.id, setName:setLabel(S.set), n:S.n, first,
     elapsed:S.endAt-S.startAt, rounds:S.round, wrong:S.firstWrong.map(i=>({id:itemId(S.set.id,S.plans[i].it), name:itemName(S.plans[i].it)})) };
   const log=store.get("log", []); log.push(rec); store.set("log", log.slice(-500));
@@ -693,9 +745,37 @@ function renderTicket(){
     <button class="btn ghost" id="again">처음 화면으로</button>
   </div>`;
 }
+function renderResult(){
+  let growth = "이 범위 첫 기록이에요";
+  if(S.prev){ const d=S.firstOk.size-S.prev.first; growth = d>0? `지난번 ${S.prev.first}/${S.prev.n} → <span class="up">+${d}</span>` : d===0? `지난번과 같아요 (${S.prev.first}/${S.prev.n})` : `지난번 ${S.prev.first}/${S.prev.n}`; }
+  return `<div class="wrap">
+    <section class="card prac-res" aria-label="연습 결과">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="prac-tag">연습</span><span class="muted" style="font-size:12px">${korDate(new Date(S.endAt))}</span></div>
+      <div><span class="chip" style="--c:${SUBJ[S.set.subj][1]}">${esc(S.set.group)}</span></div>
+      <h1 style="font-size:22px">${esc(S.set.name)} 다 맞혔어요</h1>
+      <div class="muted" style="font-size:13px">${esc(mixLine())}</div>
+      <div class="t-grid">
+        <div class="f"><span>이름</span><b>${esc(S.name)}</b></div>
+        <div class="f mono"><span>시도 횟수</span><b>${S.round}회</b></div>
+        <div class="f mono"><span>첫 시도 정답</span><b>${S.firstOk.size} / ${S.n}</b></div>
+        <div class="f mono"><span>푼 문제 수</span><b>${Object.values(S.tries).reduce((a,b)=>a+b,0)}문제</b></div>
+        <div class="f mono"><span>걸린 시간</span><b>${fmtDur(S.endAt-S.startAt)}</b></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span class="growth">${growth}</span><span class="muted" style="font-size:12px">${S.round>1? S.round+"번째 시도에 완료":"한 번에 완료!"}</span></div>
+      ${S.firstWrong.length? `<div class="field"><span class="lbl">처음에 틀린 것</span><div class="muted" style="font-size:13px;line-height:1.6">${S.firstWrong.map(i=>esc(itemLabel(S.plans[i].it))).join(" · ")}</div></div>`:""}
+    </section>
+    <p class="sent">연습 기록은 이 폰에만 남아요. 퇴실증이 아니에요.</p>
+    <button class="btn" id="again-same">같은 범위 한 번 더</button>
+    <button class="btn ghost" id="again">다른 범위 고르기</button>
+  </div>`;
+}
+function bindResult(){
+  $("#again-same").onclick=()=>startQuiz(true);
+  $("#again").onclick=()=>{ S=null; go("practice"); };
+}
 function bindTicket(){
   clockTimer=setInterval(()=>{ const c=$("#clock"); if(c) c.textContent=fmtTime(new Date()); },1000);
-  $("#again").onclick=()=>{ S=null; go("entry"); };
+  $("#again").onclick=()=>{ S=null; go(home()); };
 }
 
 /* ───────── 강사 화면 ───────── */
@@ -748,7 +828,7 @@ function bindTeacher(){
   document.querySelectorAll("[data-tcls]").forEach(b=>b.onclick=()=>{ tstate.cls=b.dataset.tcls; render(); });
   document.querySelectorAll("[data-tn]").forEach(b=>b.onclick=()=>{ tstate.n=+b.dataset.tn; render(); });
   document.querySelectorAll('input[name="set"]').forEach(x=>x.onchange=()=>{ tstate.set=x.value; render(); });
-  $("#preview").onclick=()=>{ preset={...tstate}; store.set("preset2", preset); entry={cls:tstate.cls, name:null}; S=null; go("entry"); };
+  $("#preview").onclick=()=>{ preset={...tstate, date:today()}; store.set("preset2", preset); mode="class"; entry={cls:tstate.cls, name:null}; S=null; go("entry"); };
   const box=$("#qr");
   if(window.QRCode){ try{ new QRCode(box,{text:studentURL(),width:400,height:400,colorDark:"#15211C",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M}); }catch(e){ box.textContent="QR 생성 실패"; } }
   else box.innerHTML='<span class="muted" style="line-height:1.4;font-size:13px">QR 라이브러리를 불러오지 못했어요</span>';
@@ -765,6 +845,8 @@ function render(){
   else if(view==="quiz" && S){ app.innerHTML=renderQuiz(); bindQuiz(); }
   else if(view==="lap" && S){ app.innerHTML=renderLap(); bindLap(); }
   else if(view==="ticket" && S){ app.innerHTML=renderTicket(); bindTicket(); }
+  else if(view==="result" && S){ app.innerHTML=renderResult(); bindResult(); }
+  else if(view==="practice" || (view!=="entry" && mode==="practice")){ view="practice"; app.innerHTML=renderPractice(); bindPractice(); }
   else { view="entry"; app.innerHTML=renderEntry(); bindEntry(); }
 }
 document.addEventListener("keydown",e=>{
