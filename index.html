@@ -304,7 +304,7 @@ const store = {
 const PREFS = D.prefs, REG = D.regions, JPH = D.jphis.map((e,i)=>({...e, id:"J"+String(i+1).padStart(3,"0")})), WORLD = D.world;
 const LAND = D.landforms.map((x,i)=>({...x, id:"L"+String(i+1).padStart(3,"0")}));
 const CON = D.concept.map(x=>({...x, id:"K"+x.src}));
-const LANDM = LAND.filter(x=>x.xy);
+const LANDC = LAND.filter(x=>x.core), LANDM = LANDC.filter(x=>x.xy);   // core = 자료집 03~06 요약표에 실린 지형
 const CTRY = D.countries || [], CLIM = D.climate || [];
 const WM = D.wmap, WPATH = Object.fromEntries((WM?WM.paths:[]).map(p=>[p.id,p]));
 const GW = {S:6, A:4, B:2.5, C:1.2, N:1};
@@ -315,17 +315,17 @@ const conW = x => 1;
 
 const SETS = [
   {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", composite:[
-      {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-capital","jp-land","jp-landmap"]},
+      {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
       {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-climate"]},
       {label:"일본 연표", share:.15, sets:["jp-his"]},
       {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
-      {label:"개념(기출)", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
+      {label:"개념", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
     ], pool:()=>[...PREFS, ...JPH, ...WORLD, ...LAND, ...CON, ...CTRY, ...CLIM]},
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
-  {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"도도부현 위치",   pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
+  {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"도도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
+  {id:"jp-feature", group:"일본 지리", subj:"geo", name:"도도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
   {id:"jp-capital", group:"일본 지리", subj:"geo", name:"현청소재지",     pool:()=>PREFS, w:p=>p.n===13?0:(p.diff?5:0.6), kinds:["prefCapital","capitalPref","mapCapital"]},
-  {id:"jp-land",    group:"일본 지리", subj:"geo", name:"지형·지명이 있는 현", pool:()=>LAND, w:x=>1, kinds:["landPref","landPref","prefLand"]},
-  {id:"jp-landmap", group:"일본 지리", subj:"geo", name:"지형 지도(산맥·하천·평야…)", pool:()=>LANDM, w:x=>1, kinds:["landMap"]},
+  {id:"jp-land",    group:"일본 지리", subj:"geo", name:"지형",           pool:()=>LANDC, w:x=>1, kinds:x=>x.xy ? ["landMap","landMap","landPref","prefLand"] : ["landPref","landPref","prefLand"]},
   {id:"g-country",  group:"세계 지리", subj:"geo", name:"나라 위치", pool:()=>CTRY.filter(c=>WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryMap"]},
   {id:"g-capital",  group:"세계 지리", subj:"geo", name:"수도", pool:()=>CTRY.filter(c=>c.cap && WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryCapital","capitalCountry"]},
   {id:"g-feature",  group:"세계 지리", subj:"geo", name:"나라의 특징", pool:()=>CTRY.filter(c=>c.hint), w:c=>c.core?2:1, kinds:["countryHint"]},
@@ -337,12 +337,12 @@ const SETS = [
   {id:"w-his", group:"세계 연표", subj:"his", name:"역사",     pool:()=>WORLD.filter(e=>e.f==="역사"),     w:e=>GW[e.g]||1, kinds:"chrono"},
   {id:"w-geo", group:"세계 연표", subj:"geo", name:"지리",     pool:()=>WORLD.filter(e=>e.f==="지리"),     w:e=>GW[e.g]||1, kinds:"chrono"},
   {id:"w-top", group:"세계 연표", subj:"his", name:"전 과목 S·A 등급", pool:()=>WORLD.filter(e=>e.g==="S"||e.g==="A"), w:e=>GW[e.g], kinds:"chrono"},
-  {id:"c-pol", group:"개념(기출)", subj:"pol", name:"정치",     pool:()=>CON.filter(x=>x.subj==="정치"),     w:conW, kinds:["concept"]},
-  {id:"c-eco", group:"개념(기출)", subj:"eco", name:"경제",     pool:()=>CON.filter(x=>x.subj==="경제"),     w:conW, kinds:["concept"]},
-  {id:"c-soc", group:"개념(기출)", subj:"soc", name:"현대사회", pool:()=>CON.filter(x=>x.subj==="현대사회"), w:conW, kinds:["concept"]},
-  {id:"c-his", group:"개념(기출)", subj:"his", name:"역사",     pool:()=>CON.filter(x=>x.subj==="역사"),     w:conW, kinds:["concept"]},
-  {id:"c-geo", group:"개념(기출)", subj:"geo", name:"지리",     pool:()=>CON.filter(x=>x.subj==="지리"),     w:conW, kinds:["concept"]},
-  {id:"c-all", group:"개념(기출)", subj:"con", name:"전 과목",  pool:()=>CON, w:conW, kinds:["concept"]},
+  {id:"c-pol", group:"개념", subj:"pol", name:"정치",     pool:()=>CON.filter(x=>x.subj==="정치"),     w:conW, kinds:["concept"]},
+  {id:"c-eco", group:"개념", subj:"eco", name:"경제",     pool:()=>CON.filter(x=>x.subj==="경제"),     w:conW, kinds:["concept"]},
+  {id:"c-soc", group:"개념", subj:"soc", name:"현대사회", pool:()=>CON.filter(x=>x.subj==="현대사회"), w:conW, kinds:["concept"]},
+  {id:"c-his", group:"개념", subj:"his", name:"역사",     pool:()=>CON.filter(x=>x.subj==="역사"),     w:conW, kinds:["concept"]},
+  {id:"c-geo", group:"개념", subj:"geo", name:"지리",     pool:()=>CON.filter(x=>x.subj==="지리"),     w:conW, kinds:["concept"]},
+  {id:"c-all", group:"개념", subj:"con", name:"전 과목",  pool:()=>CON, w:conW, kinds:["concept"]},
 ];
 const setById = id => SETS.find(s=>s.id===id) || SETS[0];
 const setLabel = s => s.composite ? "통합본" : s.group+" · "+s.name;
@@ -446,6 +446,17 @@ function mk(correct, wrongs, r, labelFn){
 }
 const yr = y => `<span style="font-family:var(--f-mono)">${y}</span>`;
 const prefByN = n => PREFS[n-1];
+// 도도부현 특징: 자료집 키워드 중 그 현 이름이 들어 있지 않은 항목만 단서로 씀
+function prefStem(p){ return [p.ja.replace(/[都道府県]$/,""), p.ko.replace(/(현|부|도)$/,"")]; }
+function prefClues(p){   // 현 이름이 들어간 부분은 ○○로 가림 (예: 「교토 의정서」 → 「○○ 의정서」)
+  const [sj, sk] = prefStem(p);
+  return p.kw.split(" / ").map(c=>c.trim()).filter(Boolean).map(c=>c.split(sj).join("○○").split(sk).join("○○"));
+}
+const CLUE_AVOID = {8:[11,12], 11:[8,12,14], 29:[25,26,28], 30:[22,38], 38:[22,30], 45:[46]};   // 근교농업·베드타운·귤·축산처럼 이웃 현에도 해당되는 단서
+function clueConflict(p, q){   // 단서가 다른 현 키워드에도 있으면 오답 후보에서 뺌
+  if((CLUE_AVOID[p.n]||[]).includes(q.n)) return true;
+  return prefClues(p).some(c=>{ const key=c.replace(/\(.*?\)/g,"").replace(/○○/g,"").trim().slice(0,6); return key.length>=1 && q.kw.includes(key); });
+}
 
 const BUILD = {
   /* ── 일본 지리 ── */
@@ -464,6 +475,12 @@ const BUILD = {
     return {...c, tag:"현청소재지", prompt:`현청소재지가 <span class="big ja">${esc(p.cja)}</span>인 곳은?`, explain:prefExplain(p), mapAfter:[p.n]}; },
   mapCapital(p, r){ const w=prefDistractors(p, r, 3, q=>q.n!==13 && (q.diff||r()<.3)); const c=mk(p, w, r, capLabel);
     return {...c, tag:"현청소재지", prompt:`<span style="color:var(--map-hl)">빨간색</span>으로 표시된 곳의 현청소재지는?`, map:[p.n], explain:prefExplain(p)}; },
+  prefHint(p, r){
+    const clues = prefClues(p);
+    const w = prefDistractors(p, r, 3, q=>!clueConflict(p, q));
+    const c = mk(p, w, r, prefLabel);
+    return {...c, tag:"도도부현 특징", prompt:`<span class="qtext">${clues.map(esc).join("<br>")}</span>`, subPrompt:"이 설명에 해당하는 도도부현은?", explain:prefExplain(p), mapAfter:[p.n]};
+  },
   landPref(x, r){
     const p = prefByN(pick(x.p, r));
     const w = prefDistractors(p, r, 3, ()=>true, x.p);
@@ -474,8 +491,8 @@ const BUILD = {
   },
   prefLand(x, r){
     const p = prefByN(pick(x.p, r));
-    const others = shuffle(LAND.filter(y=>y!==x && !y.p.includes(p.n) && y.t===x.t), r);
-    const rest = shuffle(LAND.filter(y=>y!==x && !y.p.includes(p.n)), r);
+    const others = shuffle(LANDC.filter(y=>y!==x && !y.p.includes(p.n) && y.t===x.t), r);
+    const rest = shuffle(LANDC.filter(y=>y!==x && !y.p.includes(p.n)), r);
     const w=[]; for(const y of [...others,...rest]){ if(w.length>=3) break; if(!w.includes(y)) w.push(y); }
     const c = mk(x, w, r, y=>({main:y.ja, sub:y.ko, ja:true}));
     return {...c, tag:x.t, prompt:`다음 중 <span class="big ja">${esc(p.ja)}</span>에 있는 것은?`,
@@ -483,7 +500,9 @@ const BUILD = {
   },
 
   landMap(x, r){
-    const same = shuffle(LANDM.filter(y=>y!==x && y.t===x.t), r).slice(0,3);
+    const line = x.xy.length>1;
+    const fill = shuffle(LANDM.filter(y=>y!==x && y.t!==x.t && (y.xy.length>1)===line), r).sort((a,b)=>(b.t==="산맥")-(a.t==="산맥"));   // 구조선 오답은 산맥부터
+    const same = [...shuffle(LANDM.filter(y=>y!==x && y.t===x.t), r), ...fill].slice(0,3);
     const c = mk(x, same, r, y=>({main:y.ja, sub:y.ko, ja:true}));
     const what = x.xy.length>1 ? `<span style="color:var(--map-hl)">빨간 선</span>으로 표시된 ${esc(x.t)}` : `<span style="color:var(--map-hl)">빨간 점</span>으로 표시된 ${esc(x.t)}`;
     return {...c, tag:x.t+" · 지도", prompt:`지도에 ${what}${josa(x.t,"는","은")}?`, svg:landSVG(x),
@@ -592,7 +611,7 @@ function planSet(set, n, seed){
     if(set.kinds==="chrono"){
       const opts=["yearToEvent","eventToYear","eventToYear","order"]; if(it.eff) opts.push("effYear");
       kind = pick(opts, r);
-    } else kind = pick(set.kinds, r);
+    } else kind = pick(typeof set.kinds==="function" ? set.kinds(it) : set.kinds, r);
     return {it, kind};
   });
 }

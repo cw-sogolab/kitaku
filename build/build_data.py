@@ -125,6 +125,7 @@ def build_jphis(d):
         yr_, ev, core, withc, gr = [x.text.strip() for x in r.cells]
         yr_ = yr_ or last; last = yr_
         ev = ev.replace('\n', ' ')
+        ev = re.sub(r'\s*\[~\s*\d{4}\]', '', ev)   # 「日清戦争 [~1895]」 같은 기간 표시는 떼고 시작 연도로
         m = re.search(r'\[(발효|시행예정)\(?(\d{4})\)?\]', ev); eff = int(m.group(2)) if m else None
         ev = re.sub(r'\s*\[(발효|시행예정)\(?\d{4}\)?\]\s*', '', ev).strip()
         li = max((i for i, ch in enumerate(ev) if hang.match(ch)), default=-1)
@@ -166,6 +167,43 @@ def build_landforms(prefs):
         items.append(dict(t=t, ja=ja, ko=ko, p=P(*pr.split(',')), note=note))
     return items
 
+def core_landform_names(d):
+    """자료집 03~06 요약표(구분|명칭|내용, 구분|지형|대표 장소|…)에 실린 이름 = 「진짜 중요한 지형」.
+    반환: (토큰 목록, 유형 힌트) — 「飛騨 · 木曽 · 赤石山脈」처럼 접미사가 마지막에만 붙은 것도 풀어서 돌려준다."""
+    SUF = ['山脈', '山地', '平野', '盆地', '半島', '海峡', '水道']
+    toks = []
+    for t in d.tables:
+        try: h = [celltext(c._tc) for c in t.rows[0].cells]
+        except Exception: continue
+        if h[:2] == ['구분', '명칭']: col = 1
+        elif h[:3] == ['구분', '지형', '대표 장소']: col = 2
+        else: continue
+        for r in t.rows[1:]:
+            cells = [celltext(c._tc) for c in r.cells]
+            kind, txt = cells[0], cells[col]
+            inner = re.findall(r'[（(]([^)）]+)[)）]', txt)
+            txt = re.sub(r'[（(][^)）]*[)）]', '', txt)
+            parts = [x.strip() for x in re.split(r'\s*[·・]\s*', txt) if x.strip()]
+            parts += [x.strip() for y in inner for x in re.split(r'\s*[·・]\s*', y) if x.strip()]
+            suf = next((sf for sf in SUF if parts and parts[-1].endswith(sf)), '')
+            if not suf: suf = {'반도': '半島', '해협': '海峡', '평야': '平野', '분지': '盆地'}.get(kind, '')
+            nmain = len(parts) - sum(len(re.split(r'\s*[·・]\s*', y)) for y in inner)
+            for i, x in enumerate(parts):
+                if i >= nmain: toks.append(('=', x)); continue          # 괄호 안(현 이름·하천 이름)은 정확히 같을 때만
+                toks.append(('^', x + suf if suf and not x.endswith(suf) else x))
+    return toks
+
+def mark_core(lands, d):
+    toks = core_landform_names(d)
+    EXTRA = {'琵琶湖', '豊後水道'}   # 요약표 본문에 나오는 이름(淀川 발원지 琵琶湖) · 해협 줄의 「豊後」
+    for x in lands:
+        ja = x['ja']; stem = re.sub(r'(山脈|山地)$', '', ja)
+        hit = ja in EXTRA or any(t == ja or (m == '^' and ((len(t) >= 2 and ja.startswith(t)) or (len(ja) >= 3 and t.startswith(ja))
+                                 or (len(stem) >= 2 and t.startswith(stem) and t.endswith(('山脈', '山地')) and ja.endswith(('山脈', '山地'))))) for m, t in toks)
+        if x['t'] == '산업·기타': hit = False    # 공업·유산은 「지형」 세트에서 뺌 (도도부현 특징에서 다룸)
+        if hit: x['core'] = 1
+    return lands
+
 def build_concept():
     out = []
     for f in sorted(glob.glob(os.path.join(HERE, 'concept', '20*.json'))): out += json.load(open(f, encoding='utf-8'))
@@ -178,7 +216,7 @@ if __name__ == '__main__':
     jpmap = build_map(); off = jpmap.pop('_off')
     sys.path.insert(0, os.path.join(HERE, 'geo')); from build_geo import build_geo
     geo = build_geo(off)
-    lands = build_landforms(prefs)
+    lands = mark_core(build_landforms(prefs), d)
     for x in lands:                                   # 지형 지도 문항용 좌표 (geo/landcoords.py)
         if x['ja'] in geo['landxy']: x['xy'] = geo['landxy'][x['ja']]
     data = dict(prefs=prefs, regions=REGIONS, jpmap=jpmap, jphis=build_jphis(d), world=build_world(a.db),
