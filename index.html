@@ -10,7 +10,7 @@
   --go:#6E4FE8; --go-2:#8B6CF6; --go-ink:#FFFFFF; --go-soft:#F1E9FF; --stop:#F25C7A; --stop-soft:#FFE6EC;
   --ticket:#FFFFFF; --ticket-ink:#2E2450; --ticket-line:#EDE6FA; --ticket-pat:transparent;
   --band:linear-gradient(120deg,#8B6CF6,#B48CFF 60%,#FFA8C0);
-  --map-land:#F1E9FF; --map-edge:#D3C2F5; --map-hl:#F25C7A;
+  --map-land:#F1E9FF; --map-edge:#D3C2F5; --map-hl:#F25C7A; --sea:#EAF1FB; --bar:#B9A6F2;
   --c-geo:#4DAE7C; --c-his:#D49A3A; --c-pol:#E86A4A; --c-eco:#5B6FD6; --c-soc:#3AA6C9;
   --shadow:0 12px 30px rgba(120,90,200,.10);
   --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
@@ -27,7 +27,7 @@
     --go:#9B7BFF; --go-2:#B69AFF; --go-ink:#1A1430; --go-soft:#3A2F6A; --stop:#FF7A96; --stop-soft:#4A2438;
     --ticket:#241C3D; --ticket-ink:#F0EAFF; --ticket-line:#3A2F5C; --ticket-pat:transparent;
     --band:linear-gradient(120deg,#6E4FE8,#8B6CF6 60%,#E06A8C);
-    --map-land:#3A2F5C; --map-edge:#241C3D; --map-hl:#FF7A96;
+    --map-land:#3A2F5C; --map-edge:#241C3D; --map-hl:#FF7A96; --sea:#1E2244; --bar:#6E5BB8;
     --shadow:0 12px 30px rgba(0,0,0,.35);
   }
 }
@@ -39,7 +39,7 @@
   --go:#9B7BFF; --go-2:#B69AFF; --go-ink:#1A1430; --go-soft:#3A2F6A; --stop:#FF7A96; --stop-soft:#4A2438;
   --ticket:#241C3D; --ticket-ink:#F0EAFF; --ticket-line:#3A2F5C; --ticket-pat:transparent;
   --band:linear-gradient(120deg,#6E4FE8,#8B6CF6 60%,#E06A8C);
-  --map-land:#3A2F5C; --map-edge:#241C3D; --map-hl:#FF7A96;
+  --map-land:#3A2F5C; --map-edge:#241C3D; --map-hl:#FF7A96; --sea:#1E2244; --bar:#6E5BB8;
   --shadow:0 12px 30px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
@@ -109,6 +109,8 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .stations .fill{position:absolute;left:0;top:50%;height:3px;margin-top:-1.5px;background:var(--go);border-radius:2px;transition:width .4s ease}
 .st{position:relative;width:11px;height:11px;border-radius:50%;background:var(--paper);border:2px solid var(--card-line);flex:none;box-shadow:0 2px 6px rgba(120,90,200,.12)}
 .st.done{background:var(--go);border-color:var(--go)}
+.stations.dense .st{width:7px;height:7px;border-width:1.5px;box-shadow:none}
+.stations.dense .st.now{transform:scale(1.5)}
 .st.now{border-color:var(--go);transform:scale(1.3)}
 
 /* question */
@@ -122,6 +124,25 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .mapbox path{fill:var(--map-land);stroke:var(--map-edge);stroke-width:1.1;stroke-linejoin:round}
 .mapbox path.hl{fill:var(--map-hl)}
 .mapbox .ring{fill:none;stroke:var(--map-hl);stroke-width:2.5}
+.mapbox svg.wmap,.mapbox svg.jzoom{max-height:40vh}
+.wmap .sea{fill:var(--sea)}
+.wmap path{fill:var(--map-land);stroke:var(--map-edge);stroke-linejoin:round}
+.wmap path.hl{fill:var(--map-hl)}
+.wmap .ring{fill:none;stroke:var(--map-hl)}
+.jzoom .sea{fill:var(--sea)}
+.jzoom .feat-line{fill:none;stroke:var(--map-hl);stroke-linecap:round;stroke-linejoin:round}
+.jzoom .feat-pt{fill:var(--map-hl);stroke:var(--paper);}
+.clim{width:100%;height:auto;max-height:36vh;display:block}
+.clim .ax{stroke:var(--muted);stroke-width:.8}
+.clim .grid{stroke:var(--line);stroke-width:.6}
+.clim .zero{stroke:var(--muted);stroke-width:.8;stroke-dasharray:3 3}
+.clim text{font-family:var(--f-body);font-size:9px;fill:var(--muted)}
+.clim .bar{fill:var(--bar)}
+.clim .tline{fill:none;stroke:var(--map-hl);stroke-width:2.2;stroke-linejoin:round}
+.clim .tdot{fill:var(--map-hl)}
+.clim .hline{fill:none;stroke:var(--go);stroke-width:1.8;stroke-linejoin:round}
+.clim .hdot{fill:var(--go)}
+.clim .mlab{font-size:9px;font-weight:700;fill:var(--ink)}
 .mapbox .inset{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
 @media (prefers-reduced-motion:no-preference){.mapbox .ring{animation:pulse 1.6s ease-out infinite;transform-box:fill-box;transform-origin:center}}
 @keyframes pulse{0%{opacity:1;transform:scale(.6)}100%{opacity:0;transform:scale(1.6)}}
@@ -283,6 +304,9 @@ const store = {
 const PREFS = D.prefs, REG = D.regions, JPH = D.jphis.map((e,i)=>({...e, id:"J"+String(i+1).padStart(3,"0")})), WORLD = D.world;
 const LAND = D.landforms.map((x,i)=>({...x, id:"L"+String(i+1).padStart(3,"0")}));
 const CON = D.concept.map(x=>({...x, id:"K"+x.src}));
+const LANDM = LAND.filter(x=>x.xy);
+const CTRY = D.countries || [], CLIM = D.climate || [];
+const WM = D.wmap, WPATH = Object.fromEntries((WM?WM.paths:[]).map(p=>[p.id,p]));
 const GW = {S:6, A:4, B:2.5, C:1.2, N:1};
 const SW = {3:4, 2:2.5, 1:1.2, 0:1};
 const SUBJ = { geo:["지리","var(--c-geo)"], his:["역사","var(--c-his)"], pol:["정치","var(--c-pol)"], eco:["경제","var(--c-eco)"], soc:["현대사회","var(--c-soc)"], all:["통합","#2E5A4C"], con:["개념","#6B4FA0"] };
@@ -291,15 +315,21 @@ const conW = x => 1;
 
 const SETS = [
   {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", composite:[
-      {label:"일본 지리", share:.25, sets:["jp-region","jp-pref","jp-capital","jp-land"]},
-      {label:"일본 연표", share:.20, sets:["jp-his"]},
-      {label:"세계 연표", share:.25, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
+      {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-capital","jp-land","jp-landmap"]},
+      {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-climate"]},
+      {label:"일본 연표", share:.15, sets:["jp-his"]},
+      {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
       {label:"개념(기출)", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
-    ], pool:()=>[...PREFS, ...JPH, ...WORLD, ...LAND, ...CON]},
+    ], pool:()=>[...PREFS, ...JPH, ...WORLD, ...LAND, ...CON, ...CTRY, ...CLIM]},
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
   {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"도도부현 위치",   pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
   {id:"jp-capital", group:"일본 지리", subj:"geo", name:"현청소재지",     pool:()=>PREFS, w:p=>p.n===13?0:(p.diff?5:0.6), kinds:["prefCapital","capitalPref","mapCapital"]},
   {id:"jp-land",    group:"일본 지리", subj:"geo", name:"지형·지명이 있는 현", pool:()=>LAND, w:x=>1, kinds:["landPref","landPref","prefLand"]},
+  {id:"jp-landmap", group:"일본 지리", subj:"geo", name:"지형 지도(산맥·하천·평야…)", pool:()=>LANDM, w:x=>1, kinds:["landMap"]},
+  {id:"g-country",  group:"세계 지리", subj:"geo", name:"나라 위치", pool:()=>CTRY.filter(c=>WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryMap"]},
+  {id:"g-capital",  group:"세계 지리", subj:"geo", name:"수도", pool:()=>CTRY.filter(c=>c.cap && WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryCapital","capitalCountry"]},
+  {id:"g-feature",  group:"세계 지리", subj:"geo", name:"나라의 특징", pool:()=>CTRY.filter(c=>c.hint), w:c=>c.core?2:1, kinds:["countryHint"]},
+  {id:"g-climate",  group:"세계 지리", subj:"geo", name:"기후 그래프(쾨펜)", pool:()=>CLIM, w:x=>1, kinds:["climOndo","climHyther","climCity"]},
   {id:"jp-his",     group:"일본 연표", subj:"his", name:"일본 관련 연표", pool:()=>JPH, w:e=>GW[e.g]||1, kinds:"chrono"},
   {id:"w-pol", group:"세계 연표", subj:"pol", name:"정치",     pool:()=>WORLD.filter(e=>e.f==="정치"),     w:e=>GW[e.g]||1, kinds:"chrono"},
   {id:"w-eco", group:"세계 연표", subj:"eco", name:"경제",     pool:()=>WORLD.filter(e=>e.f==="경제"),     w:e=>GW[e.g]||1, kinds:"chrono"},
@@ -313,7 +343,6 @@ const SETS = [
   {id:"c-his", group:"개념(기출)", subj:"his", name:"역사",     pool:()=>CON.filter(x=>x.subj==="역사"),     w:conW, kinds:["concept"]},
   {id:"c-geo", group:"개념(기출)", subj:"geo", name:"지리",     pool:()=>CON.filter(x=>x.subj==="지리"),     w:conW, kinds:["concept"]},
   {id:"c-all", group:"개념(기출)", subj:"con", name:"전 과목",  pool:()=>CON, w:conW, kinds:["concept"]},
-  {id:"g-soon", group:"세계 지리", subj:"geo", name:"나라 위치·해협·기후그래프·통계", soon:"다음 단계에서 추가", pool:()=>[], kinds:[]}
 ];
 const setById = id => SETS.find(s=>s.id===id) || SETS[0];
 const setLabel = s => s.composite ? "통합본" : s.group+" · "+s.name;
@@ -329,6 +358,75 @@ function mapSVG(hl, opts={}){
   const b=M.inset;
   return `<svg viewBox="${M.vb}" role="img" aria-label="일본 지도"><rect class="inset" x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="4"/>${paths}${rings}</svg>`;
 }
+
+/* ───────── 세계지도 · 지형 지도 · 기후 그래프 (직접 그림) ───────── */
+function worldSVG(iso){
+  const t = WPATH[iso]; const [x0,y0,x1,y1] = t.bb;
+  let w = Math.max((x1-x0)*2.6, 64), h = Math.max((y1-y0)*2.6, 50);
+  if(w < h*1.3) w = h*1.3; else h = w/1.3;
+  if(w > 1000){ w = 1000; h = 1000/1.3; }
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  let vx = Math.max(-500, Math.min(500-w, cx-w/2)), vy = Math.max(-260, Math.min(260-h, cy-h/2));
+  const sw = (w/300).toFixed(2);
+  let paths = "";
+  for(const p of WM.paths){ const b=p.bb; if(b[2] < vx-40 || b[0] > vx+w+40 || b[3] < vy-40 || b[1] > vy+h+40) continue;
+    paths += `<path d="${p.d}"${p.id===iso?' class="hl"':''}/>`; }
+  const small = (x1-x0) < w*0.05 && (y1-y0) < h*0.05;
+  const ring = small ? `<circle class="ring" cx="${t.c[0]}" cy="${t.c[1]}" r="${(w*0.045).toFixed(1)}" stroke-width="${(w/160).toFixed(2)}"/>` : "";
+  return `<svg class="wmap" viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" role="img" aria-label="세계 지도"><rect class="sea" x="${vx-10}" y="${vy-10}" width="${w+20}" height="${h+20}"/><g stroke-width="${sw}">${paths}</g>${ring}</svg>`;
+}
+function landSVG(x){
+  const xs=x.xy.map(p=>p[0]), ys=x.xy.map(p=>p[1]);
+  const bx0=Math.min(...xs), bx1=Math.max(...xs), by0=Math.min(...ys), by1=Math.max(...ys);
+  let w=Math.max(bx1-bx0+90, 170), h=Math.max(by1-by0+90, 150); if(w<h*1.15) w=h*1.15; else h=w/1.15;
+  const [,,VW,VH]=M.vb.split(" ").map(Number);
+  let vx=Math.max(0,Math.min(VW-w,(bx0+bx1)/2-w/2)), vy=Math.max(0,Math.min(VH-h,(by0+by1)/2-h/2));
+  if(w>VW){ vx=0; } if(h>VH){ vy=0; }
+  const u=w/170;
+  let paths=""; M.paths.forEach((p,i)=>{ if(i<46) paths+=`<path d="${p.d}"/>`; });
+  const feat = x.xy.length>1
+    ? `<polyline class="feat-line" points="${x.xy.map(p=>p.join(",")).join(" ")}" stroke-width="${(3.2*u).toFixed(1)}"/>`
+    : `<circle class="ring" cx="${x.xy[0][0]}" cy="${x.xy[0][1]}" r="${(9*u).toFixed(1)}"/><circle class="feat-pt" cx="${x.xy[0][0]}" cy="${x.xy[0][1]}" r="${(4*u).toFixed(1)}" stroke-width="${(1.2*u).toFixed(1)}"/>`;
+  return `<svg class="jzoom" viewBox="${vx.toFixed(0)} ${vy.toFixed(0)} ${w.toFixed(0)} ${h.toFixed(0)}" role="img" aria-label="일본 지도 확대"><rect class="sea" x="${vx-5}" y="${vy-5}" width="${w+10}" height="${h+10}"/><g stroke-width="${(0.9*u).toFixed(2)}">${paths}</g>${feat}</svg>`;
+}
+const T_MIN=-30, T_MAX=40, P_MAX=600;
+function climSVG(st, mode){
+  const L=36, R=284, T=16, B=186, H=B-T;
+  const ty = t => B - (t-T_MIN)/(T_MAX-T_MIN)*H;
+  let g = "";
+  for(let t=T_MIN; t<=T_MAX; t+=10){ g += `<line class="${t===0?'zero':'grid'}" x1="${L}" x2="${R}" y1="${ty(t)}" y2="${ty(t)}"/><text x="${L-4}" y="${ty(t)+3}" text-anchor="end">${t}</text>`; }
+  if(mode==="ondo"){
+    const mw=(R-L)/12, py = p => B - p/P_MAX*H;
+    for(let p=0; p<=P_MAX; p+=100) g += `<text x="${R+4}" y="${py(p)+3}">${p}</text>`;
+    let bars="", pts=[];
+    for(let m=0;m<12;m++){
+      const x=L+mw*m+mw/2;
+      if(st.p){ const v=Math.min(st.p[m],P_MAX); bars += `<rect class="bar" x="${(x-mw*0.32).toFixed(1)}" y="${py(v).toFixed(1)}" width="${(mw*0.64).toFixed(1)}" height="${(B-py(v)).toFixed(1)}"/>`; }
+      pts.push([x, ty(st.t[m])]);
+      g += `<text x="${x}" y="${B+12}" text-anchor="middle">${m+1}</text>`;
+    }
+    const line = `<polyline class="tline" points="${pts.map(p=>p.map(v=>v.toFixed(1)).join(",")).join(" ")}"/>` + pts.map(p=>`<circle class="tdot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.4"/>`).join("");
+    return `<svg class="clim" viewBox="0 0 320 212" role="img" aria-label="기후 그래프"><text x="${L-4}" y="${T-6}" text-anchor="end">℃</text><text x="${R+4}" y="${T-6}">mm</text><text x="${(L+R)/2}" y="${B+24}" text-anchor="middle">월</text>${g}<line class="ax" x1="${L}" x2="${R}" y1="${B}" y2="${B}"/>${bars}${line}${st.p?"":`<text x="${(L+R)/2}" y="${T+14}" text-anchor="middle">강수량 관측 없음</text>`}</svg>`;
+  }
+  // 하이더그래프: 가로 강수량, 세로 기온
+  const px = p => L + Math.min(p,P_MAX)/P_MAX*(R-L);
+  for(let p=0; p<=P_MAX; p+=100) g += `<line class="grid" x1="${px(p)}" x2="${px(p)}" y1="${T}" y2="${B}"/><text x="${px(p)}" y="${B+12}" text-anchor="middle">${p}</text>`;
+  const pts = st.t.map((t,m)=>[px(st.p[m]), ty(t)]);
+  const lab = [0,6].map(m=>`<text class="mlab" x="${(pts[m][0]+5).toFixed(1)}" y="${(pts[m][1]-4).toFixed(1)}">${m+1}월</text>`).join("");
+  return `<svg class="clim" viewBox="0 0 320 212" role="img" aria-label="하이더그래프"><text x="${L-4}" y="${T-6}" text-anchor="end">℃</text><text x="${(L+R)/2}" y="${B+24}" text-anchor="middle">강수량(mm)</text>${g}<line class="ax" x1="${L}" x2="${R}" y1="${B}" y2="${B}"/><polygon class="hline" points="${pts.map(p=>p.map(v=>v.toFixed(1)).join(",")).join(" ")}"/>${pts.map(p=>`<circle class="hdot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6"/>`).join("")}${lab}</svg>`;
+}
+const CLIM_CONF = {Af:["Am","Aw","Cfa"], Am:["Af","Aw","Cw"], Aw:["Am","Cw","BS","Af"], BW:["BS","Cs","Aw"], BS:["BW","Cs","Aw","Dw"],
+  Cs:["Cfb","BS","Cfa","Cw"], Cfb:["Cfa","Cs","Df"], Cfa:["Cfb","Cw","Df","Cs"], Cw:["Cfa","Aw","Dw"], Df:["Dw","Cfb","ET"], Dw:["Df","Cw","BS"], ET:["EF","Df","Dw"], EF:["ET","Df","Dw"]};
+const CLIM_NAME = Object.fromEntries(CLIM.map(c=>[c.k,[c.kn,c.kj]]));
+function climWrong(k, r, n=3){ const pref=shuffle(CLIM_CONF[k]||[], r); const rest=shuffle(Object.keys(CLIM_NAME).filter(x=>x!==k && !pref.includes(x)), r); return [...pref,...rest].filter(x=>CLIM_NAME[x]).slice(0,n); }
+const climExplain = st => `<b>${esc(st.k)} ${esc(st.kn)}</b> <span class="ja muted">${esc(st.kj)}</span><br>${esc(st.why)}<br><span class="muted">${esc(st.ko)}${st.cn&&st.cn!==st.ko?`(${esc(st.cn)})`:""} · 기상청 세계 평년값(1991–2020)${st.st?` · ${esc(st.st)} 관측소`:""}</span>`;
+function nearCountries(c, n, pred=()=>true){
+  const t=WPATH[c.iso]; if(!t) return shuffle(CTRY.filter(x=>x!==c && pred(x)), Math.random).slice(0,n);
+  return CTRY.filter(x=>x!==c && WPATH[x.iso] && pred(x)).map(x=>[x, Math.hypot(WPATH[x.iso].c[0]-t.c[0], WPATH[x.iso].c[1]-t.c[1])]).sort((a,b)=>a[1]-b[1]).slice(0,n).map(a=>a[0]);
+}
+const ctryLabel = c => ({main:c.ko, sub:c.ja});
+const josa = (w, a, b) => { const ch=w.charCodeAt(w.length-1); return (ch>=0xAC00 && ch<=0xD7A3 && (ch-0xAC00)%28) ? b : a; };   // 받침 없으면 a, 있으면 b
+const ctryExplain = c => `<b>${esc(c.ko)}</b> <span class="ja muted">${esc(c.ja)}</span>${c.cap?` · 수도 ${esc(c.cap)}`:""} · ${esc(c.reg)}${c.hint?`<br><span class="muted">${esc(c.hint)}</span>`:""}`;
 
 /* ───────── 문항 생성 ───────── */
 const prefLabel = p => ({main:p.ja, sub:p.ko, ja:true});
@@ -382,6 +480,54 @@ const BUILD = {
     const c = mk(x, w, r, y=>({main:y.ja, sub:y.ko, ja:true}));
     return {...c, tag:x.t, prompt:`다음 중 <span class="big ja">${esc(p.ja)}</span>에 있는 것은?`,
       explain:`<b class="ja">${esc(x.ja)}</b>(${esc(x.ko)}) — ${esc(x.t)} · <span class="ja">${esc(p.ja)}</span><br><span class="muted">${esc(x.note)}</span><br><span class="muted">${w.map(y=>`${esc(y.ja)} → ${y.p.map(n=>esc(prefByN(n).ja)).join("·")}`).join(" / ")}</span>`, mapAfter:[p.n]};
+  },
+
+  landMap(x, r){
+    const same = shuffle(LANDM.filter(y=>y!==x && y.t===x.t), r).slice(0,3);
+    const c = mk(x, same, r, y=>({main:y.ja, sub:y.ko, ja:true}));
+    const what = x.xy.length>1 ? `<span style="color:var(--map-hl)">빨간 선</span>으로 표시된 ${esc(x.t)}` : `<span style="color:var(--map-hl)">빨간 점</span>으로 표시된 ${esc(x.t)}`;
+    return {...c, tag:x.t+" · 지도", prompt:`지도에 ${what}${josa(x.t,"는","은")}?`, svg:landSVG(x),
+      explain:`<b class="ja">${esc(x.ja)}</b>(${esc(x.ko)}) — ${x.p.map(n=>`<span class="ja">${esc(prefByN(n).ja)}</span>`).join(" · ")}<br><span class="muted">${esc(x.note)}</span>`};
+  },
+
+  /* ── 세계 지리 ── */
+  countryMap(c, r){
+    const w = nearCountries(c, 3);
+    const k = mk(c, w, r, ctryLabel);
+    return {...k, tag:"나라 위치", prompt:`지도에 <span style="color:var(--map-hl)">빨간색</span>으로 칠한 나라는?`, svg:worldSVG(c.iso), explain:ctryExplain(c)};
+  },
+  countryCapital(c, r){
+    const w = nearCountries(c, 6, x=>x.cap && x.cap!==c.cap).slice(0,3);
+    const k = mk(c, w, r, x=>({main:x.cap}));
+    return {...k, tag:"수도", prompt:`<span style="color:var(--map-hl)">빨간색</span>으로 칠한 나라의 수도는?`, svg:worldSVG(c.iso), explain:ctryExplain(c)};
+  },
+  capitalCountry(c, r){
+    if(c.cap===c.ko) return BUILD.countryCapital(c, r);
+    const w = nearCountries(c, 3, x=>x.cap);
+    const k = mk(c, w, r, ctryLabel);
+    return {...k, tag:"수도", prompt:`<span class="big">${esc(c.cap)}</span>어느 나라의 수도일까?`, svgAfter:worldSVG(c.iso), explain:ctryExplain(c)};
+  },
+  countryHint(c, r){
+    const reg = shuffle(CTRY.filter(x=>x!==c && x.reg===c.reg), r), near = nearCountries(c, 6);
+    const w=[]; for(const x of [...reg, ...near]){ if(w.length>=3) break; if(!w.includes(x)) w.push(x); }
+    const k = mk(c, w, r, ctryLabel);
+    return {...k, tag:"나라의 특징", prompt:`<span class="qtext">${esc(c.hint)}</span>`, subPrompt:"이 설명에 해당하는 나라는?", svgAfter: WPATH[c.iso]? worldSVG(c.iso) : null, explain:ctryExplain(c)};
+  },
+  climOndo(st, r){
+    const k = mk(st.k, climWrong(st.k, r), r, x=>({main:`${x} ${CLIM_NAME[x][0]}`, sub:CLIM_NAME[x][1]}));
+    return {...k, tag:"기후 그래프", prompt:`이 기후 그래프(雨温図)에 해당하는 기후는?`, svg:climSVG(st,"ondo"), explain:climExplain(st)};
+  },
+  climHyther(st, r){
+    if(!st.p) return BUILD.climOndo(st, r);
+    const k = mk(st.k, climWrong(st.k, r), r, x=>({main:`${x} ${CLIM_NAME[x][0]}`, sub:CLIM_NAME[x][1]}));
+    return {...k, tag:"하이더그래프", prompt:`이 하이더그래프(ハイサーグラフ)에 해당하는 기후는?`, svg:climSVG(st,"hyther"), explain:climExplain(st)};
+  },
+  climCity(st, r){
+    const kinds = climWrong(st.k, r);
+    const w = kinds.map(k=>shuffle(CLIM.filter(x=>x.k===k), r)[0]).filter(Boolean).slice(0,3);
+    const k = mk(st, w, r, x=>({main:x.ko, sub:x.cn && x.cn!==x.ko ? x.cn : ""}));
+    return {...k, tag:"기후 그래프 · 도시", prompt:`이 기후 그래프(雨温図)에 해당하는 도시는?`, svg:climSVG(st,"ondo"),
+      explain: climExplain(st) + `<br><span class="muted">${w.map(x=>`${esc(x.ko)} = ${esc(x.k)}`).join(" / ")}</span>`};
   },
 
   /* ── 연표 (한국어) ── */
@@ -615,7 +761,7 @@ function railHTML(){
   const left=S.n-S.cleared.size;
   return `<div class="rail">
     <div class="rail-top"><span class="home-count">집까지<b>${left}</b>문제</span><span class="lap">${S.round>1? S.round+"번째 바퀴 · 틀린 것만" : (S.pos+1)+" / "+S.queue.length}</span></div>
-    <div class="track"><span class="end">教室</span><div class="stations"><span class="fill" style="width:${S.cleared.size/S.n*100}%"></span>${stations}</div><span class="end">自宅</span></div>
+    <div class="track"><span class="end">教室</span><div class="stations${S.n>20?" dense":""}"><span class="fill" style="width:${S.cleared.size/S.n*100}%"></span>${stations}</div><span class="end">自宅</span></div>
   </div>`;
 }
 function renderQuiz(){
@@ -645,6 +791,7 @@ function renderQuiz(){
       <div class="qtag"><span class="chip" style="--c:${sc}">${esc(qs.group)}${S.set.composite&&qs.id.startsWith("w-")?" · "+esc(qs.name):""}</span><span>${esc(q.tag)}</span></div>
       <div class="prompt">${q.prompt}${q.subPrompt?`<span style="display:block;font-size:16px;margin-top:6px">${q.subPrompt}</span>`:""}</div>
       ${showMap?`<div class="mapbox">${mapSVG(mapIds,{ring:q.ring})}</div>`:""}
+      ${q.svg?`<div class="mapbox">${q.svg}</div>`:""}${S.answered && q.svgAfter?`<div class="mapbox">${q.svgAfter}</div>`:""}
       <div class="choices">${choices}</div>
       ${fb}
     </section>

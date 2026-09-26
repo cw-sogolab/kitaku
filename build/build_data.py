@@ -7,7 +7,7 @@
 출력: ../data.js
 필요 패키지: python-docx openpyxl japanmap numpy
 """
-import argparse, json, re, glob, os, collections, unicodedata
+import argparse, json, re, glob, os, collections, unicodedata, sys
 import docx, openpyxl, numpy as np, japanmap as jm
 W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -111,7 +111,7 @@ def build_map():
         dstr = 'M'+'L'.join(f'{x-ox:.0f} {y-oy:.0f}' for x, y in out)+'Z'
         c = np.mean(out, axis=0)-[ox, oy]
         paths.append(dict(d=dstr, cx=round(c[0]), cy=round(c[1])))
-    return dict(vb=f"0 0 {Wd:.0f} {H:.0f}", inset=[round(box[0]-ox), round(box[1]-oy), round(box[2]), round(box[3])], paths=paths)
+    return dict(vb=f"0 0 {Wd:.0f} {H:.0f}", inset=[round(box[0]-ox), round(box[1]-oy), round(box[2]), round(box[3])], paths=paths, _off=(float(ox), float(oy)))
 
 YEAR_IN_NAME = re.compile(r'\d{4}')
 def build_jphis(d):
@@ -175,8 +175,15 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('--jp', required=True); ap.add_argument('--db', required=True); a = ap.parse_args()
     d = docx.Document(a.jp)
     prefs = build_prefs(d)
-    data = dict(prefs=prefs, regions=REGIONS, jpmap=build_map(), jphis=build_jphis(d), world=build_world(a.db),
-                landforms=build_landforms(prefs), concept=build_concept(),
+    jpmap = build_map(); off = jpmap.pop('_off')
+    sys.path.insert(0, os.path.join(HERE, 'geo')); from build_geo import build_geo
+    geo = build_geo(off)
+    lands = build_landforms(prefs)
+    for x in lands:                                   # 지형 지도 문항용 좌표 (geo/landcoords.py)
+        if x['ja'] in geo['landxy']: x['xy'] = geo['landxy'][x['ja']]
+    data = dict(prefs=prefs, regions=REGIONS, jpmap=jpmap, jphis=build_jphis(d), world=build_world(a.db),
+                landforms=lands, concept=build_concept(),
+                wmap=geo['wmap'], countries=geo['countries'], climate=geo['climate'],
                 meta=dict(built=__import__('datetime').date.today().isoformat()))
     out = os.path.join(HERE, '..', 'data.js')
     open(out, 'w', encoding='utf-8').write('window.KITAKU_DATA='+json.dumps(data, ensure_ascii=False, separators=(',', ':'))+';')
