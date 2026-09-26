@@ -1,8 +1,3 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>帰宅クイズ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -215,15 +210,12 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .worst div{display:flex;gap:8px}
 .worst .c{margin-left:auto;font-family:var(--f-mono);color:var(--stop)}
 </style>
-</head>
-<body>
 
 <header class="top">
   <div class="logo"><i></i>帰宅クイズ</div>
-  <span class="mock">목업</span>
   <nav class="nav" aria-label="화면 전환">
     <button id="nav-student" aria-pressed="true">학생</button>
-    <button id="nav-teacher" aria-pressed="false">강사</button>
+    <button id="nav-teacher" aria-pressed="false" hidden>강사</button>
   </nav>
 </header>
 <main id="app" aria-live="polite"></main>
@@ -240,6 +232,7 @@ const CONFIG = {
   defaultN: 20,
   plannedBase: "https://cw-sogolab.github.io/kitaku/",
   secret: "kitaku-2026",
+  teacherPinHash: 189797738,       // 강사 화면 PIN의 hashStr 값 (초기 PIN 7350). 바꾸려면 콘솔에서 hashStr("새PIN") 실행 후 여기 붙여넣기
   classes: { "토일반": [], "화목반": [] },   // 반 이름 (학생 이름은 본인이 입력)
   form: {                          // 구글 폼 연결 후 채움 (비어 있으면 이 기기에만 저장)
     url: "",
@@ -473,13 +466,39 @@ const params = new URLSearchParams(location.search);
 let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:"화목반"});
 if(params.get("set")) preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||preset.c};
 let S = null;         // 퀴즈 진행 상태
-let view = location.hash==="#teacher" ? "teacher" : "entry";
+const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
+let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : "entry";
 let entry = {cls: params.get("c") || store.get("lastCls", preset.c), name: store.get("lastName", null)};
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
 $("#nav-student").onclick = ()=>{ if(view==="teacher") go(S&&!S.done? "quiz" : "entry"); };
-$("#nav-teacher").onclick = ()=>go("teacher");
+$("#nav-teacher").onclick = ()=>go(tUnlocked() ? "teacher" : "pin");
+window.addEventListener("hashchange", ()=>{ if(location.hash==="#teacher") go(tUnlocked() ? "teacher" : "pin"); });
+
+/* ───────── 화면: 강사 PIN ───────── */
+function renderPin(){
+  return `<div class="wrap">
+    <section class="card" style="display:flex;flex-direction:column;gap:12px">
+      <span class="eyebrow">강사 화면</span>
+      <h1 style="font-size:22px">PIN을 입력하세요</h1>
+      <div class="field"><label for="pin">강사 PIN</label><input id="pin" class="pick" type="password" inputmode="numeric" autocomplete="off" maxlength="12" autofocus></div>
+      <div class="muted" id="pin-msg" style="font-size:13px;min-height:1.2em"></div>
+      <button class="btn primary" id="pin-go">열기</button>
+      <button class="btn ghost" id="pin-back">학생 화면으로</button>
+    </section>
+  </div>`;
+}
+function bindPin(){
+  const inp=$("#pin"), msg=$("#pin-msg");
+  const tryPin=()=>{
+    if(hashStr(inp.value.trim())===CONFIG.teacherPinHash){ try{ sessionStorage.setItem("kitaku.t","1"); }catch(e){} $("#nav-teacher").hidden=false; go("teacher"); }
+    else { msg.textContent="PIN이 달라요."; inp.value=""; inp.focus(); }
+  };
+  $("#pin-go").onclick=tryPin;
+  inp.onkeydown=e=>{ if(e.key==="Enter") tryPin(); };
+  $("#pin-back").onclick=()=>{ history.replaceState(null,"",location.pathname+location.search); go("entry"); };
+}
 
 /* ───────── 화면: 입장 ───────── */
 function renderEntry(){
@@ -491,9 +510,6 @@ function renderEntry(){
       <div><span class="chip" style="--c:${sc}">${esc(set.group)}</span></div>
       <h1>${esc(set.name)}</h1>
       <div class="meta"><span><b>${preset.n}</b>문항</span>${set.composite?`<span>${set.composite.map(c=>esc(c.label)+" "+Math.round(c.share*100)+"%").join(" · ")}</span>`:""}<span>다 맞히면 퇴실</span><span>틀린 문제는 다시 나와요</span></div>
-      <div class="field" style="margin-top:6px"><label for="setpick">목업 전용 · 다른 범위 풀어보기</label>
-        <select id="setpick" class="pick">${[...new Set(SETS.map(s=>s.group))].map(g=>`<optgroup label="${esc(g)}">${SETS.filter(s=>s.group===g).map(s=>`<option value="${s.id}" ${s.id===set.id?"selected":""} ${s.soon?"disabled":""}>${esc(s.name)}${s.soon?" (준비 중)":""}</option>`).join("")}</optgroup>`).join("")}</select>
-      </div>
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><span class="lbl">반</span>
@@ -513,7 +529,6 @@ function bindEntry(){
   if(ni){ ni.oninput=()=>{ entry.name=ni.value.trim().replace(/\s+/g," ")||null; st0.disabled=!entry.name; st0.textContent=entry.name?"시작하기":"이름을 먼저 입력하세요"; };
           ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(); }; }
   const st=$("#start"); if(st) st.onclick=startQuiz;
-  const sp=$("#setpick"); if(sp) sp.onchange=()=>{ preset={...preset, set:sp.value}; store.set("preset2", preset); tstate.set=sp.value; render(); };
 }
 function startQuiz(){
   if(!entry.name) return;
@@ -673,7 +688,7 @@ function renderTicket(){
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <span class="growth">${growth}</span><span class="muted" style="font-size:12px">${S.round>1? S.round+"번째 시도에 통과":"한 번에 통과!"}</span>
     </div>
-    <p class="sent">${S.sent?"결과가 선생님 시트로 전송됐어요.":"목업: 결과는 이 기기에만 저장됐어요 (강사 화면에서 확인)."}<br>문 앞에서 이 화면을 선생님께 보여주세요.</p>
+    <p class="sent">${S.sent?"결과가 선생님 시트로 전송됐어요.":"결과는 이 기기에 저장됐어요."}<br>문 앞에서 이 화면을 선생님께 보여주세요.</p>
     <button class="btn ghost" id="again">처음 화면으로</button>
   </div>`;
 }
@@ -720,7 +735,7 @@ function renderTeacher(){
         </section>
         <section class="card" style="display:flex;flex-direction:column;gap:12px">
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2 style="font-size:16px">오늘 퇴실 기록</h2><span class="muted" style="font-size:12px">${log.length}명</span></div>
-          <div class="note">목업에서는 이 기기에서 푼 기록만 보입니다. 실제 사이트에서는 학생 폰마다 구글 시트로 자동 전송되고, 같은 내용이 시트에 쌓입니다.</div>
+          <div class="note">여기에는 이 기기에서 푼 기록만 보입니다. 학생들 결과는 구글 폼을 연결하면 시트에 쌓입니다.</div>
           ${log.length? `<div class="tbl"><table><thead><tr><th>시각</th><th>이름</th><th>반</th><th>세트</th><th>첫 시도</th><th>시도</th><th>시간</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">아직 기록이 없어요. 학생 화면에서 한 세트를 끝까지 풀어보세요.</div>`}
           ${worst.length? `<div class="field"><span class="lbl">첫 시도에 많이 틀린 문항</span><div class="worst">${worst.map(w=>`<div><span>${esc(w.name)}</span><span class="c">${w.c}명</span></div>`).join("")}</div></div>`:""}
         </section>
@@ -743,7 +758,9 @@ function render(){
   $("#nav-student").setAttribute("aria-pressed", view!=="teacher");
   $("#nav-teacher").setAttribute("aria-pressed", view==="teacher");
   const app=$("#app");
-  if(view==="teacher"){ app.innerHTML=renderTeacher(); bindTeacher(); }
+  $("#nav-teacher").hidden = !(tUnlocked() || view==="teacher");
+  if(view==="pin"){ app.innerHTML=renderPin(); bindPin(); }
+  else if(view==="teacher"){ app.innerHTML=renderTeacher(); bindTeacher(); }
   else if(view==="quiz" && S){ app.innerHTML=renderQuiz(); bindQuiz(); }
   else if(view==="lap" && S){ app.innerHTML=renderLap(); bindLap(); }
   else if(view==="ticket" && S){ app.innerHTML=renderTicket(); bindTicket(); }
@@ -757,5 +774,3 @@ document.addEventListener("keydown",e=>{
 render();
 })();
 </script>
-</body>
-</html>
