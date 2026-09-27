@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F3ECFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1A1430" media="(prefers-color-scheme: dark)">
+<meta name="format-detection" content="telephone=no">
 <title>帰宅クイズ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,8 +51,10 @@
   --shadow:0 12px 30px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
-html{background:var(--ground)}
-body{background:var(--bg) fixed;min-height:100vh;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;padding-inline:16px;padding-block:0 40px}
+html{background:var(--ground);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0}
+button,input,select{touch-action:manipulation}
+body{background:var(--bg);background-attachment:scroll;min-height:100vh;min-height:100dvh;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;padding-inline:max(16px,env(safe-area-inset-left)) max(16px,env(safe-area-inset-right));padding-block:0 calc(40px + env(safe-area-inset-bottom))}
 .ja{font-family:var(--f-ja)}
 button{font:inherit;color:inherit}
 :focus-visible{outline:2.5px solid var(--go);outline-offset:2px}
@@ -94,7 +104,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .seg button{flex:1;border:0;background:none;border-radius:11px;padding:10px 4px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap}
 .seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 4px 10px rgba(120,90,200,.15)}
 
-.pick{width:100%;font:inherit;font-size:15px;font-weight:600;color:var(--ink);background:var(--paper-2);border:1.5px solid transparent;border-radius:14px;padding:12px 14px}
+.pick{width:100%;font:inherit;font-size:16px;font-weight:600;color:var(--ink);background:var(--paper-2);border:1.5px solid transparent;border-radius:14px;padding:12px 14px}
 
 /* rail */
 .rail{display:flex;flex-direction:column;gap:8px}
@@ -158,6 +168,13 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .mapbox .lab circle{fill:var(--paper);stroke:var(--ink);stroke-width:1.6}
 .mapbox .lab text{font-family:var(--f-mono);font-size:13px;font-weight:500;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
 .choices{display:flex;flex-direction:column;gap:8px}
+.choices.grid2{display:grid;grid-template-columns:1fr 1fr}
+.choices.grid2 .choice .t{flex-direction:column;align-items:flex-start;gap:0}
+.choices.grid2 .choice{gap:8px;padding:10px}
+.choices.grid2 .choice .k{width:22px;height:22px;font-size:12px}
+.choices.grid2 .choice .t .main,.choices.grid2 .choice .t .sub{word-break:keep-all;overflow-wrap:anywhere}
+.choices.grid2 .choice .t .sub{font-size:12px;line-height:1.3}
+@media (max-width:359px){.choices.grid2{grid-template-columns:1fr}.choices.grid2 .choice .t{flex-direction:row;align-items:baseline}}
 .choice{display:flex;align-items:center;gap:12px;text-align:left;width:100%;border:1.5px solid var(--card-line);background:var(--card);border-radius:16px;padding:12px 14px;cursor:pointer;min-height:56px;box-shadow:0 4px 14px rgba(120,90,200,.06)}
 .choice .k{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-size:13px;font-weight:500;background:var(--paper-2);border:0;color:var(--muted)}
 .choice .t{flex:1;display:flex;flex-direction:row;align-items:baseline;justify-content:space-between;gap:4px 10px;flex-wrap:wrap;min-width:0}
@@ -165,7 +182,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .choice .t .sub{font-family:var(--f-ja);font-size:13px;color:var(--muted)}
 .choice .t .main.ja{font-family:var(--f-ja);font-size:18px}
 .choice.year .t .main{font-family:var(--f-mono);font-size:20px;font-weight:500;letter-spacing:.02em}
-.choice:hover:not(:disabled){border-color:var(--go-2)}
+@media (hover:hover){.choice:hover:not(:disabled){border-color:var(--go-2)}}
 .choice:disabled{cursor:default}
 .choice.right{border-color:var(--go);background:var(--go-soft)}
 .choice.right .k{background:var(--go);color:var(--go-ink);border-color:var(--go)}
@@ -243,8 +260,34 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .worst{display:flex;flex-direction:column;gap:6px;font-size:13px}
 .worst div{display:flex;gap:8px}
 .worst .c{margin-left:auto;font-family:var(--f-mono);color:var(--stop)}
+/* 휴대폰(가로 430px 이하): 글자·여백 조금 줄임 */
+@media (max-width:430px){
+  body{font-size:14px}
+  .wrap{padding-top:10px;gap:12px}
+  .card{padding:16px;border-radius:20px}
+  .setcard h1{font-size:25px}
+  .prompt{font-size:18px}
+  .prompt .big{font-size:21px}
+  .prompt .qtext{font-size:16.5px}
+  .choice{padding:10px 12px;min-height:50px;gap:10px;border-radius:14px}
+  .choice .t .main{font-size:15px}
+  .choice .t .main.ja{font-size:16.5px}
+  .choice.year .t .main{font-size:18px}
+  .btn{padding:15px 16px;font-size:16px}
+  .home-count b{font-size:20px}
+  .mapbox{padding:8px;border-radius:18px}
+  .t-grid .f b,.t-grid .f.mono b{font-size:15.5px}
+  .band-test{font-size:20px}
+  .mapbox svg,.mapbox svg.wmap,.mapbox svg.jzoom{max-height:30vh}
+  .clim{max-height:27vh}
+  .choices.grid2 .choice{padding:9px 10px;min-height:46px}
+  .q{gap:10px}
+  .rail{gap:6px}
+}
 </style>
 
+</head>
+<body>
 <header class="top">
   <div class="logo"><i></i>帰宅クイズ</div>
   <nav class="nav" aria-label="화면 전환">
@@ -811,7 +854,7 @@ function renderQuiz(){
       <div class="prompt">${q.prompt}${q.subPrompt?`<span style="display:block;font-size:16px;margin-top:6px">${q.subPrompt}</span>`:""}</div>
       ${showMap?`<div class="mapbox">${mapSVG(mapIds,{ring:q.ring})}</div>`:""}
       ${q.svg?`<div class="mapbox">${q.svg}</div>`:""}${S.answered && q.svgAfter?`<div class="mapbox">${q.svgAfter}</div>`:""}
-      <div class="choices">${choices}</div>
+      <div class="choices${(showMap||q.svg) && !q.order && q.choices.every(c=>String(c.main).length<=8) ? " grid2":""}">${choices}</div>
       ${fb}
     </section>
   </div>`;
@@ -1033,3 +1076,5 @@ document.addEventListener("keydown",e=>{
 render();
 })();
 </script>
+</body>
+</html>

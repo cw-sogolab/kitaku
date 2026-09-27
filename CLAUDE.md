@@ -109,3 +109,10 @@ kitaku-quiz/
 ## 모바일
 - `<!doctype html>` + viewport 메타 필수(없으면 휴대폰이 980px 데스크톱 화면으로 그려서 크게 보임).
 - 휴대폰용 크기 조정은 `<style>` 맨 끝 `@media (max-width:430px)` 블록(기본 규칙보다 뒤에 있어야 적용됨).
+
+## 학생 분석 (강사 화면 「학생 분석」 탭)
+- 시트 기록을 Apps Script 웹 앱(doGet, JSONP)으로 읽음. 코드 원본: `build/apps_script.gs` (KEY 자리표시자).
+- 실제 KEY가 든 파일은 저장소 밖 `~/ilgong/kitaku_apps_script.gs` — **KEY를 저장소·index.html에 넣지 말 것** (공개 사이트).
+- 웹 앱 URL·KEY는 강사 화면 「연결 설정」에서 입력 → 그 브라우저 localStorage(kitaku.an.url / kitaku.an.key)에만 저장. URL은 CONFIG.statsUrl에 넣어도 됨(키 없인 못 읽음).
+- 분석: 반·수업/연습·기간 필터, 학생별 정답률·추이·약한 영역, 영역별 정답률(통합본은 비율로 영역별 출제 수 계산), 많이 틀린 문항. 학생은 이름(공백 제거)으로 묶음.
+- 문항 ID(J·L 번호)는 data.js 순서 기반이라 자료 갱신 뒤 옛 기록의 문항 이름이 어긋날 수 있음(시트의 문항 이름은 그대로 남음).
