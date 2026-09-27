@@ -1027,6 +1027,7 @@ function renderPractice(){
       ${hist.length?`<div class="muted" style="font-size:13px">이 범위 지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
     <button class="btn" id="start" ${entry.name?"":"disabled"}>${entry.name? "연습 시작" : "이름을 먼저 입력하세요"}</button>
+    <div style="text-align:center"><button class="linkbtn" id="to-mine">내 기록 보기 →</button></div>
     ${hasClass?`<div style="text-align:center"><button class="linkbtn" id="to-class">오늘 퇴실 퀴즈로 →</button></div>`:`<p class="muted" style="text-align:center;font-size:12px">수업 퇴실 퀴즈는 선생님이 띄운 QR로 들어오세요.</p>`}
   </div>`;
 }
@@ -1038,6 +1039,7 @@ function bindPractice(){
   ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(true); };
   st0.onclick=()=>startQuiz(true);
   const tc=$("#to-class"); if(tc) tc.onclick=()=>{ mode="class"; go("entry"); };
+  $("#to-mine").onclick=()=>openMine("practice");
 }
 
 function startQuiz(practice){
@@ -1147,6 +1149,7 @@ function finish(){
   const rec = { ts:new Date().toISOString(), hm:fmtTime(new Date()).slice(0,5), date, cls:S.cls, name:S.name, set:S.set.id, setName:(S.practice?"연습 · ":"")+setLabel(S.set), n:S.n, first,
     elapsed:S.endAt-S.startAt, rounds:S.round, wrong:S.firstWrong.map(i=>({id:itemId(S.set.id,S.plans[i].it), name:itemName(S.plans[i].it)})) };
   if(!S.practice){ const log=store.get("log", []); log.push(rec); store.set("log", log.slice(-500)); }
+  { const my=store.get("mylog", []); my.push({ts:rec.ts, name:S.name, cls:S.cls, set:S.set.id, setName:setLabel(S.set), n:S.n, first, sec:Math.round(rec.elapsed/1000), rounds:S.round, wrong:rec.wrong, practice:!!S.practice}); store.set("mylog", my.slice(-500)); }
   S.sent = submit(rec);
   go(S.practice? "result" : "ticket");
 }
@@ -1203,6 +1206,7 @@ function renderTicket(){
     </div>
     <p class="sent">${S.sent?"결과가 선생님 시트로 전송됐어요.":"결과는 이 기기에 저장됐어요."}<br>문 앞에서 이 화면을 선생님께 보여주세요.</p>
     <button class="btn ghost" id="again">처음 화면으로</button>
+    <div style="text-align:center"><button class="linkbtn" id="to-mine">내 기록 보기 →</button></div>
   </div>`;
 }
 function renderResult(){
@@ -1227,16 +1231,81 @@ function renderResult(){
     <p class="sent">${S.sent?"연습 기록이 선생님 시트에 「연습」으로 저장됐어요.":"연습 기록은 이 폰에 저장됐어요."} 퇴실증이 아니에요.</p>
     <button class="btn" id="again-same">같은 범위 한 번 더</button>
     <button class="btn ghost" id="again">다른 범위 고르기</button>
+    <div style="text-align:center"><button class="linkbtn" id="to-mine">내 기록 보기 →</button></div>
   </div>`;
 }
 function bindResult(){
   $("#again-same").onclick=()=>startQuiz(true);
   $("#again").onclick=()=>{ S=null; go("practice"); };
+  $("#to-mine").onclick=()=>{ S=null; openMine("practice"); };
 }
 function bindTicket(){
   clockTimer=setInterval(()=>{ const c=$("#clock"); if(c) c.textContent=fmtTime(new Date()); },1000);
   $("#again").onclick=()=>{ S=null; go(home()); };
+  $("#to-mine").onclick=()=>{ clearInterval(clockTimer); openMine(home()); };
 }
+
+
+/* ───────── 내 기록 (이 기기에 저장된 기록만) ───────── */
+let mineBack = null, mineName = null;
+function mineAll(){
+  const seen=new Set(), out=[];
+  const add=(r,practice)=>{ if(!r||!r.ts||!r.name||seen.has(r.ts)) return; seen.add(r.ts);
+    const set=SETS.find(x=>x.id===r.set) || anSet(r.setName); const n=+r.n, first=+r.first; if(!n) return;
+    const wrong=r.wrong||[]; const {asked,wg}=anDerive(set, r.setName, n, first, wrong);
+    out.push({ts:new Date(r.ts), name:r.name, key:String(r.name).replace(/\s+/g,""), cls:practice?"연습":r.cls, setName:String(r.setName||"").replace(/^연습 · /,""), set, practice, first, n,
+      sec: r.sec!=null? +r.sec : Math.round((+r.elapsed||0)/1000), rounds:+r.rounds||1, wrong, asked, wg}); };
+  store.get("mylog", []).forEach(r=>add(r, !!r.practice));
+  store.get("log", []).forEach(r=>add(r, false));
+  return out.sort((a,b)=>a.ts-b.ts);
+}
+function streakDays(rs){
+  const days=new Set(rs.map(r=>r.ts.toDateString())); let n=0; const d=new Date();
+  if(!days.has(d.toDateString())) d.setDate(d.getDate()-1);
+  while(days.has(d.toDateString())){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+function renderMine(){
+  const all=mineAll(), names=[...new Set(all.map(r=>r.name))];
+  if(!mineName || !names.includes(mineName)) mineName = names.includes(entry.name)? entry.name : (names.includes(store.get("lastName",""))? store.get("lastName","") : names[names.length-1]);
+  const back=`<button class="btn small ghost" id="mine-back" style="align-self:flex-start">← 돌아가기</button>`;
+  const note=`<p class="hint" style="text-align:center">이 폰(브라우저)에서 푼 기록만 보여요. 다른 기기에서 푼 기록은 선생님 화면에서 볼 수 있어요.</p>`;
+  if(!all.length) return `<div class="wrap">${back}<section class="card an-msg">아직 이 폰에 저장된 기록이 없어요.<br>퀴즈를 한 번 끝까지 풀면 여기에 쌓여요.</section>${note}</div>`;
+  const rs=all.filter(r=>r.name===mineName), s=anSum(rs);
+  const since7=Date.now()-7*864e5, p7=rs.filter(r=>r.practice && r.ts>=since7).length, st=streakDays(rs);
+  const bySet={}; rs.forEach(r=>{ const k=r.set? setLabel(r.set) : r.setName; const x=bySet[k]||(bySet[k]={k,c:0,f:0,q:0,last:r.ts}); x.c++; x.f+=r.first; x.q+=r.n; x.last=r.ts; });
+  const sets=Object.values(bySet).sort((a,b)=>b.last-a.last);
+  const worst=anWorst(rs, 10), recent=rs.slice(-10).reverse();
+  return `<div class="wrap mine">
+    ${back}
+    <section class="card setcard" style="gap:8px">
+      <div class="stk s1">★</div><div class="stk s2">☆</div>
+      <span class="eyebrow">내 기록</span>
+      <h1>${esc(mineName)}</h1>
+      ${names.length>1? `<select id="mine-name" class="pick" aria-label="이름">${names.map(n=>`<option ${n===mineName?"selected":""}>${esc(n)}</option>`).join("")}</select>` : ""}
+    </section>
+    <div class="kpis">
+      <div class="kpi"><span>푼 횟수</span><b>${s.n}<small>회</small></b><em>수업 ${s.cls} · 연습 ${s.prac}</em></div>
+      <div class="kpi"><span>첫 시도 정답률</span><b>${pct(s.acc)}</b></div>
+      <div class="kpi"><span>연속 공부</span><b>${st}<small>일</small></b><em>${st? "오늘도 이어가요!" : "오늘 한 세트 풀어볼까요?"}</em></div>
+      <div class="kpi"><span>최근 7일 연습</span><b>${p7}<small>회</small></b></div>
+    </div>
+    <section class="card an-card"><div class="an-ttl"><h2>첫 시도 정답률 추이</h2><span class="legend"><i class="dot on"></i>수업 <i class="dot"></i>연습</span></div>${trendSVG(rs)}</section>
+    <section class="card an-card"><div class="an-ttl"><h2>영역별 첫 시도 정답률</h2></div>${barsHTML(s, null)}</section>
+    <section class="card an-card"><div class="an-ttl"><h2>자주 틀린 문항</h2><span class="muted" style="font-size:12px">첫 시도 기준</span></div>
+      ${worst.length? `<ol class="wlist">${worst.map(w=>`<li><span class="gchip">${esc(w.g||"기타")}</span><span class="lb">${esc(w.label)}</span><span class="c">${w.c}회</span></li>`).join("")}</ol>` : `<div class="empty">첫 시도에 틀린 문항이 없어요. 👏</div>`}</section>
+    <section class="card an-card"><div class="an-ttl"><h2>범위별</h2></div><div class="tbl"><table><thead><tr><th>범위</th><th>횟수</th><th>정답률</th><th>마지막</th></tr></thead><tbody>
+      ${sets.map(x=>`<tr><td>${esc(x.k)}</td><td class="num">${x.c}</td><td class="num">${pct(x.f/x.q)}</td><td class="muted">${agoTxt(x.last)}</td></tr>`).join("")}</tbody></table></div></section>
+    <section class="card an-card"><div class="an-ttl"><h2>최근 기록</h2></div><div class="tbl"><table><thead><tr><th>날짜</th><th>구분</th><th>범위</th><th>첫 시도</th><th>시간</th></tr></thead><tbody>
+      ${recent.map(r=>`<tr><td class="num">${mmdd(r.ts)}</td><td>${r.practice?"연습":"수업"}</td><td>${esc(r.set? setLabel(r.set) : r.setName)}</td><td class="num">${r.first}/${r.n}</td><td class="num">${fmtDur(r.sec*1000)}</td></tr>`).join("")}</tbody></table></div></section>
+    ${note}
+  </div>`;
+}
+function bindMine(){
+  $("#mine-back").onclick=()=>{ const b=mineBack||home(); mineBack=null; go(b); };
+  const sel=$("#mine-name"); if(sel) sel.onchange=()=>{ mineName=sel.value; render(); };
+}
+function openMine(from){ mineBack=from; go("mine"); window.scrollTo(0,0); }
 
 /* ───────── 강사 화면 ───────── */
 let tstate = {cls:preset.c, set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem("kitaku.ttab")||"set"; }catch(e){ return "set"; } })()};
@@ -1293,7 +1362,7 @@ function bindTeacher(){
   document.querySelectorAll("[data-tn]").forEach(b=>b.onclick=()=>{ tstate.n=+b.dataset.tn; render(); });
   document.querySelectorAll('input[name="set"]').forEach(x=>x.onchange=()=>{ tstate.set=x.value; render(); });
   $("#clear-local").onclick=()=>{ if(!confirm("이 기기에 저장된 풀이 기록(오늘 퇴실 기록·지난 점수)을 모두 지울까요? 시트 기록은 그대로예요.")) return;
-    try{ Object.keys(localStorage).filter(k=>/^kitaku\.(log|hist\.|phist\.)/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){} render(); };
+    try{ Object.keys(localStorage).filter(k=>/^kitaku\.(log|mylog|hist\.|phist\.)/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){} render(); };
   $("#preview").onclick=()=>{ preset={...tstate, date:today()}; store.set("preset2", preset); mode="class"; entry={cls:tstate.cls, name:null}; S=null; go("entry"); };
   const box=$("#qr");
   if(window.QRCode){ try{ new QRCode(box,{text:studentURL(),width:400,height:400,colorDark:"#15211C",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M}); }catch(e){ box.textContent="QR 생성 실패"; } }
@@ -1319,6 +1388,19 @@ function anSet(label){
   return null;
 }
 const AN_ID = /, (?=(?:P\d{2}|L\d{3}|J\d{3}|G\d+|CL\d+|EV-\d+|WL\d{3}|WS\d{3}|K\d{4}-[\w-]+) )/;
+function anDerive(set, setName, n, first, wrong){   // 영역별 출제 수·첫 시도 오답 수
+  const idx=anIndex(), asked={}, wg={};
+  if(set && set.composite){
+    const raw=set.composite.map(p=>p.share*n), q=raw.map(Math.floor); let left=n-q.reduce((a,b)=>a+b,0);
+    raw.map((v,i)=>[v-Math.floor(v),i]).sort((a,b)=>b[0]-a[0]).forEach(([_,i])=>{ if(left>0){ q[i]++; left--; } });
+    set.composite.forEach((p,i)=>asked[p.label]=(asked[p.label]||0)+q[i]);
+    wrong.forEach(w=>{ const g=(idx[w.id]||{}).g; if(g) wg[g]=(wg[g]||0)+1; });
+  } else {
+    const g = set? set.group : (String(setName||"").replace(/^연습 · /,"").split(" · ")[0].replace(/^개념\(기출\)/,"개념"));
+    if(AN_GROUPS.includes(g)){ asked[g]=n; wg[g]=n-first; }
+  }
+  return {asked, wg};
+}
 function anParse(head, rows){
   const H=head.map(h=>String(h).trim());
   const col=(re,def)=>{ const i=H.findIndex((h,k)=>k>0 && re.test(h)); return i>=0? i : def; };
@@ -1336,16 +1418,7 @@ function anParse(head, rows){
     const wtxt=String(r[C.wrong]||"").trim();
     const wrong = wtxt? wtxt.split(AN_ID).map(s=>{ const k=s.indexOf(" "); const id=k>0? s.slice(0,k) : s; return {id, name:k>0? s.slice(k+1) : ""}; }) : [];
     // 영역별 출제 수·첫 시도 오답 수
-    const asked={}, wg={};
-    if(set && set.composite){
-      const raw=set.composite.map(p=>p.share*n), q=raw.map(Math.floor); let left=n-q.reduce((a,b)=>a+b,0);
-      raw.map((v,i)=>[v-Math.floor(v),i]).sort((a,b)=>b[0]-a[0]).forEach(([_,i])=>{ if(left>0){ q[i]++; left--; } });
-      set.composite.forEach((p,i)=>asked[p.label]=(asked[p.label]||0)+q[i]);
-      wrong.forEach(w=>{ const g=(idx[w.id]||{}).g; if(g) wg[g]=(wg[g]||0)+1; });
-    } else {
-      const g = set? set.group : (setName.replace(/^연습 · /,"").split(" · ")[0].replace(/^개념\(기출\)/,"개념"));
-      if(AN_GROUPS.includes(g)){ asked[g]=n; wg[g]=n-first; }
-    }
+    const {asked, wg} = anDerive(set, setName, n, first, wrong);
     const t=ts; const day=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0");
     return { ts, day, name, key:name.replace(/\s+/g,""), cls: practice? "연습" : cls, setName: setName.replace(/^연습 · /,""), set, practice, first, n,
              sec:+r[C.time]||0, rounds:+r[C.rounds]||1, wrong, asked, wg };
@@ -1533,6 +1606,7 @@ function render(){
   else if(view==="lap" && S){ app.innerHTML=renderLap(); bindLap(); }
   else if(view==="ticket" && S){ app.innerHTML=renderTicket(); bindTicket(); }
   else if(view==="result" && S){ app.innerHTML=renderResult(); bindResult(); }
+  else if(view==="mine"){ app.innerHTML=renderMine(); bindMine(); }
   else if(view==="practice" || (view!=="entry" && mode==="practice")){ view="practice"; app.innerHTML=renderPractice(); bindPractice(); }
   else { view="entry"; app.innerHTML=renderEntry(); bindEntry(); }
 }
