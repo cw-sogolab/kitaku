@@ -2,7 +2,8 @@
 """帰宅クイズ data.js 재생성.
 입력:
   --jp   「EJU 일본 지리·연표 자료집.docx」 (수업/03_실전반/3_자료집/B_지도)
-  --db   EJU_연표DB_v9.xlsx (수업/03_실전반/3_자료집/A_연표)
+  --db   EJU_연표DB.xlsx (수업/03_실전반/3_자료집/A_연표)
+  --wg   「EJU 세계지리 자료집.docx」 (같은 B_지도 폴더) — 자연지리·주요 통계
   build/concept/20xx-x.json  개념 문항 (SPEC.md 규격)
 출력: ../data.js
 필요 패키지: python-docx openpyxl japanmap numpy
@@ -210,7 +211,7 @@ def build_concept():
     return out
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(); ap.add_argument('--jp', required=True); ap.add_argument('--db', required=True); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument('--jp', required=True); ap.add_argument('--db', required=True); ap.add_argument('--wg', help='EJU 세계지리 자료집.docx (자연지리·통계)'); a = ap.parse_args()
     d = docx.Document(a.jp)
     prefs = build_prefs(d)
     jpmap = build_map(); off = jpmap.pop('_off')
@@ -223,6 +224,9 @@ if __name__ == '__main__':
                 landforms=lands, concept=build_concept(),
                 wmap=geo['wmap'], countries=geo['countries'], climate=geo['climate'],
                 meta=dict(built=__import__('datetime').date.today().isoformat()))
+    if a.wg:
+        from build_wgeo import build_wgeo
+        wg = build_wgeo(a.wg); data.update(wland=wg['wland'], wstat=wg['wstat'], wbelts=wg['belts'])
     out = os.path.join(HERE, '..', 'data.js')
     open(out, 'w', encoding='utf-8').write('window.KITAKU_DATA='+json.dumps(data, ensure_ascii=False, separators=(',', ':'))+';')
     print({k: (len(v) if isinstance(v, list) else '-') for k, v in data.items()}, '->', out)

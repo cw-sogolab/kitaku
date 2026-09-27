@@ -136,7 +136,8 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .mapbox path{fill:var(--map-land);stroke:var(--map-edge);stroke-width:1.1;stroke-linejoin:round}
 .mapbox path.hl{fill:var(--map-hl)}
 .mapbox .ring{fill:none;stroke:var(--map-hl);stroke-width:2.5}
-.mapbox svg.wmap,.mapbox svg.jzoom{max-height:40vh}
+.mapbox svg.jzoom{max-height:40vh}
+.mapbox svg.wmap{aspect-ratio:1.3;width:min(100%, calc(40vh * 1.3));max-height:none;margin:0 auto}
 .wmap .sea{fill:var(--sea)}
 .wmap path{fill:var(--map-land);stroke:var(--map-edge);stroke-linejoin:round}
 .wmap path.hl{fill:var(--map-hl)}
@@ -144,6 +145,10 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .jzoom .sea{fill:var(--sea)}
 .jzoom .feat-line{fill:none;stroke:var(--map-hl);stroke-linecap:round;stroke-linejoin:round}
 .jzoom .feat-pt{fill:var(--map-hl);stroke:var(--paper);}
+.wfeat .feat-line{fill:none;stroke:var(--map-hl);stroke-linecap:round;stroke-linejoin:round}
+.wfeat .feat-pt{fill:var(--map-hl);stroke:var(--paper)}
+.wfeat .feat-head{fill:var(--map-hl)}
+.wmap{overflow:hidden}
 .clim{width:100%;height:auto;max-height:36vh;display:block}
 .clim .ax{stroke:var(--muted);stroke-width:.8}
 .clim .grid{stroke:var(--line);stroke-width:.6}
@@ -342,7 +347,8 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
   .mapbox{padding:8px;border-radius:18px}
   .t-grid .f b,.t-grid .f.mono b{font-size:15.5px}
   .band-test{font-size:20px}
-  .mapbox svg,.mapbox svg.wmap,.mapbox svg.jzoom{max-height:30vh}
+  .mapbox svg,.mapbox svg.jzoom{max-height:30vh}
+  .mapbox svg.wmap{width:min(100%, calc(30vh * 1.3))}
   .clim{max-height:27vh}
   .choices.grid2 .choice{padding:9px 10px;min-height:46px}
   .q{gap:10px}
@@ -415,6 +421,8 @@ const LAND = D.landforms.map((x,i)=>({...x, id:"L"+String(i+1).padStart(3,"0")})
 const CON = D.concept.map(x=>({...x, id:"K"+x.src}));
 const LANDC = LAND.filter(x=>x.core), LANDM = LANDC.filter(x=>x.xy);   // core = 자료집 03~06 요약표에 실린 지형
 const CTRY = D.countries || [], CLIM = D.climate || [];
+const WLAND = (D.wland || []).filter(x=>x.t!=="산"), WBELT = D.wbelts || {};
+const WSTAT = (D.wstat || []).map(x=>({...x, ko: x.kind==="most" ? x.q+" 나라" : x.item+(x.meas?" "+x.meas:"")}));
 const WM = D.wmap, WPATH = Object.fromEntries((WM?WM.paths:[]).map(p=>[p.id,p]));
 const GW = {S:6, A:4, B:2.5, C:1.2, N:1};
 const SW = {3:4, 2:2.5, 1:1.2, 0:1};
@@ -425,11 +433,11 @@ const conW = x => 1;
 const SETS = [
   {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", composite:[
       {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
-      {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-climate"]},
+      {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-climate","g-land","g-stat"]},
       {label:"일본 연표", share:.15, sets:["jp-his"]},
       {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
       {label:"개념", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
-    ], pool:()=>[...PREFS, ...JPH, ...(CONFIG.worldChrono? WORLD : []), ...LAND, ...CON, ...CTRY, ...CLIM]},
+    ], pool:()=>[...PREFS, ...JPH, ...(CONFIG.worldChrono? WORLD : []), ...LAND, ...CON, ...CTRY, ...CLIM, ...WLAND, ...WSTAT]},
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
   {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"도도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
   {id:"jp-feature", group:"일본 지리", subj:"geo", name:"도도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
@@ -439,6 +447,8 @@ const SETS = [
   {id:"g-capital",  group:"세계 지리", subj:"geo", name:"수도", pool:()=>CTRY.filter(c=>c.cap && WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryCapital","capitalCountry"]},
   {id:"g-feature",  group:"세계 지리", subj:"geo", name:"나라의 특징", pool:()=>CTRY.filter(c=>c.hint), w:c=>c.core?2:1, kinds:["countryHint"]},
   {id:"g-climate",  group:"세계 지리", subj:"geo", name:"기후 그래프(쾨펜)", pool:()=>CLIM, w:x=>1, kinds:["climOndo","climHyther","climCity"]},
+  {id:"g-land",     group:"세계 지리", subj:"geo", name:"자연지리(지형)", pool:()=>WLAND, w:x=>x.t==="해류"||x.t==="해협·운하"?1.5:1, kinds:wlKinds},
+  {id:"g-stat",     group:"세계 지리", subj:"geo", name:"주요 통계", pool:()=>WSTAT, w:x=>x.kind==="most"?3:(x.cat==="농산물"||x.cat==="에너지 자원"?1.2:1), kinds:wsKinds},
   {id:"jp-his",     group:"일본 연표", subj:"his", name:"일본 관련 연표", pool:()=>JPH, w:e=>GW[e.g]||1, kinds:"chrono"},
   {id:"w-pol", group:"세계 연표", subj:"pol", name:"정치",     pool:()=>WORLD.filter(e=>e.f==="정치"),     w:e=>GW[e.g]||1, kinds:"chrono"},
   {id:"w-eco", group:"세계 연표", subj:"eco", name:"경제",     pool:()=>WORLD.filter(e=>e.f==="경제"),     w:e=>GW[e.g]||1, kinds:"chrono"},
@@ -573,6 +583,83 @@ function clueConflict(p, q){   // 단서가 다른 현 키워드에도 있으면
   return prefClues(p).some(c=>{ const key=c.replace(/\(.*?\)/g,"").replace(/○○/g,"").trim().slice(0,6); return key.length>=1 && q.kw.includes(key); });
 }
 
+
+/* ── 세계 자연지리 · 통계 ── */
+function wlKinds(x){
+  const k=[]; if(x.xy) k.push("wlMap","wlMap");
+  if(x.t==="산맥"){ if(x.belt) k.push("wlBelt"); k.push("wlCont"); }
+  else if(x.t==="고원·평원") k.push("wlCont");
+  else if(x.t==="하천") k.push("wlMouth","wlClue");
+  else if(x.t==="해협·운하") k.push("wlLink","wlClue");
+  else if(x.t==="해류") k.push("wlCurClue","wlWarm");
+  else k.push("wlClue");
+  return k.filter(kd=>kd!=="wlClue" || wlClues(x).length);
+}
+function wsKinds(x){
+  if(x.kind==="most") return ["stMost"];
+  const k=["stTop","stTop","stNotIn"];
+  if(WSTAT.filter(y=>y.kind==="rank" && y.cat===x.cat && y.meas===x.meas).length>=4) k.push("stWhich","stWhich");
+  return k;
+}
+const WL_SUFFIX = /(강|반도|섬|제도|해협|운하|해류|산맥|고원|고지|만|해)$/;
+function wlStems(x){ const names=[x.ko.replace(/\(.*?\)/g,""), ...(x.ko.match(/\((.*?)\)/)||[]).slice(1), ...(x.stem||[])];
+  return names.flatMap(n=>n.split("·")).map(n=>n.trim().replace(WL_SUFFIX,"").trim()).filter(n=>n.length>=2); }
+function wlClues(x){
+  const parts=[...(x.where? x.where.split(" · "):[]), ...(x.note? x.note.split(" · "):[])].map(t=>t.trim()).filter(Boolean);
+  const st=wlStems(x); return parts.filter(t=>!st.some(z=>t.includes(z)));
+}
+function wlConflict(x, y){
+  const cx=wlClues(x).join(" "), cy=[y.where||"", y.note||""].join(" ");
+  if(wlStems(y).some(z=>cx.includes(z))) return true;
+  return wlClues(x).some(t=>{ const k=t.replace(/[「」()·\s]/g,"").slice(0,4); return k.length>=3 && cy.replace(/[「」()·\s]/g,"").includes(k); });
+}
+function wlPick(x, r, pred, n=3){
+  const same=shuffle(WLAND.filter(y=>y!==x && y.t===x.t && pred(y)), r);
+  return same.slice(0,n);
+}
+const wlLabel = y => ({main:y.ko});
+function wlExplain(x){
+  const bits=[];
+  if(x.cont) bits.push(x.cont); if(x.belt) bits.push(x.belt); if(x.where) bits.push(x.where);
+  if(x.mouth) bits.push("하구: "+x.mouth); if(x.link) bits.push(x.link); if(x.t==="해류") bits.push(x.warm?"난류":"한류");
+  return `<b>${esc(x.ko)}</b> — ${esc(x.t)}${bits.length?" · "+bits.map(esc).join(" · "):""}${x.note?`<br><span class="muted">${esc(x.note)}</span>`:""}`;
+}
+function wfeatSVG(x){
+  const pts=x.xy.flat(), xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  let w=Math.max((x1-x0)*1.7, 120), h=Math.max((y1-y0)*1.7, 90);
+  if(w < h*1.3) w = h*1.3; else h = w/1.3;
+  if(w > 1000){ w = 1000; h = 1000/1.3; }
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  const vx = Math.max(-500, Math.min(500-w, cx-w/2)), vy = Math.max(-260, Math.min(260-h, cy-h/2));
+  const u=w/300;
+  let paths=""; for(const p of WM.paths){ const b=p.bb; if(b[2] < vx-40 || b[0] > vx+w+40 || b[3] < vy-40 || b[1] > vy+h+40) continue; paths += `<path d="${p.d}"/>`; }
+  const arrow = x.t==="해류";
+  const feat = x.xy.map(l => l.length>1
+      ? `<polyline class="feat-line" points="${l.map(p=>p.join(",")).join(" ")}" stroke-width="${(3*u).toFixed(2)}"/>`
+      : `<circle class="ring" cx="${l[0][0]}" cy="${l[0][1]}" r="${(11*u).toFixed(1)}" stroke-width="${(2*u).toFixed(2)}"/><circle class="feat-pt" cx="${l[0][0]}" cy="${l[0][1]}" r="${(4.5*u).toFixed(1)}" stroke-width="${(1.3*u).toFixed(2)}"/>`).join("");
+  // 해류 화살촉: marker 대신 마지막 두 점 방향으로 삼각형을 직접 그림 (marker는 브라우저마다 표시가 달라서)
+  const heads = arrow ? x.xy.filter(l=>l.length>1).map(l=>{ const [ax,ay]=l[l.length-2], [bx,by]=l[l.length-1]; const a=Math.atan2(by-ay,bx-ax), L=16*u, W=8*u;
+      const p1=[bx+Math.cos(a)*L*0.4, by+Math.sin(a)*L*0.4], p2=[bx-Math.cos(a)*L*0.6+Math.cos(a+Math.PI/2)*W, by-Math.sin(a)*L*0.6+Math.sin(a+Math.PI/2)*W], p3=[bx-Math.cos(a)*L*0.6-Math.cos(a+Math.PI/2)*W, by-Math.sin(a)*L*0.6-Math.sin(a+Math.PI/2)*W];
+      return `<path class="feat-head" d="M${p1.map(v=>v.toFixed(1)).join(" ")}L${p2.map(v=>v.toFixed(1)).join(" ")}L${p3.map(v=>v.toFixed(1)).join(" ")}Z"/>`; }).join("") : "";
+  const defs = "";
+  return `<svg class="wmap wfeat" viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" role="img" aria-label="세계 지도">${defs}<rect class="sea" x="${vx-10}" y="${vy-10}" width="${w+20}" height="${h+20}"/><g stroke-width="${(w/300).toFixed(2)}">${paths}</g>${feat}${heads}</svg>`;
+}
+const WS_ALL = () => [...new Set(WSTAT.flatMap(x=>x.ranks||[]))];
+function wsOutsiders(x, r, n){
+  const inCat=[...new Set(WSTAT.filter(y=>y.cat===x.cat && y.ranks).flatMap(y=>y.ranks))];
+  const pool=shuffle(inCat.filter(c=>!x.ranks.includes(c)), r), rest=shuffle(WS_ALL().filter(c=>!x.ranks.includes(c) && !pool.includes(c)), r);
+  return [...pool, ...rest].slice(0,n);
+}
+const circ = i => "①②③④⑤⑥⑦⑧⑨⑩"[i];
+function wsExplain(x){
+  const lab = m => `${esc(x.item)} ${esc(m)}`;
+  let h = `<b>${lab(x.meas||"")}</b> ${x.ranks.map((c,i)=>`${circ(i)} ${esc(c)}`).join(" ")}`;
+  for(const [m,l] of Object.entries(x.other||{})) h += `<br><span class="muted">${esc(x.item)} ${esc(m)}: ${l.length>1? l.map((c,i)=>`${circ(i)} ${esc(c)}`).join(" ") : esc(l[0])}</span>`;
+  if(x.note) h += `<br><span class="muted">${esc(x.note)}</span>`;
+  return h;
+}
+
 const BUILD = {
   /* ── 일본 지리 ── */
   mapPref(p, r){ const c=mk(p, prefDistractors(p,r), r, prefLabel);
@@ -662,6 +749,88 @@ const BUILD = {
     const k = mk(st, w, r, x=>({main:x.ko, sub:x.cn && x.cn!==x.ko ? x.cn : ""}));
     return {...k, tag:"기후 그래프 · 도시", prompt:`이 기후 그래프(雨温図)에 해당하는 도시는?`, svg:climSVG(st,"ondo"),
       explain: climExplain(st) + `<br><span class="muted">${w.map(x=>`${esc(x.ko)} = ${esc(x.k)}`).join(" / ")}</span>`};
+  },
+
+
+  /* ── 세계 자연지리 ── */
+  wlMap(x, r){
+    const w = wlPick(x, r, y=>y.xy);
+    const c = mk(x, w, r, wlLabel);
+    const what = x.t==="해류" ? `<span style="color:var(--map-hl)">빨간 화살표</span>로 표시된 해류` : x.xy.some(l=>l.length>1) ? `<span style="color:var(--map-hl)">빨간 선</span>으로 표시된 ${esc(x.t)}` : `<span style="color:var(--map-hl)">빨간 점</span>으로 표시된 ${esc(x.t)}`;
+    return {...c, tag:x.t+" · 지도", prompt:`지도에 ${what}${josa(x.t.split("·").pop(),"는","은")}?`, svg:wfeatSVG(x), explain:wlExplain(x)};
+  },
+  wlClue(x, r){
+    const cl = wlClues(x); if(!cl.length) return BUILD.wlMap(x, r);
+    const c = mk(x, wlPick(x, r, y=>!wlConflict(x,y) && !wlConflict(y,x)), r, wlLabel);
+    return {...c, tag:x.t, prompt:`<span class="qtext">${cl.map(esc).join("<br>")}</span>`, subPrompt:`이 설명에 해당하는 ${esc(x.t)}${josa(x.t.split("·").pop(),"는","은")}?`, svgAfter:x.xy?wfeatSVG(x):null, explain:wlExplain(x)};
+  },
+  wlMouth(x, r){
+    const others = shuffle([...new Set(WLAND.filter(y=>y.t==="하천" && y.mouth && y.mouth!==x.mouth).map(y=>y.mouth))], r).slice(0,3);
+    const c = mk(x.mouth, others, r, m=>({main:m}));
+    return {...c, tag:"하천 · 하구", prompt:`<span class="big">${esc(x.ko)}</span>어느 바다로 흘러들까?`, svgAfter:x.xy?wfeatSVG(x):null,
+      explain:wlExplain(x)+`<br><span class="muted">${WLAND.filter(y=>y.t==="하천" && others.includes(y.mouth)).map(y=>`${esc(y.ko)} → ${esc(y.mouth)}`).join(" / ")}</span>`};
+  },
+  wlLink(x, r){
+    const c = mk(x, wlPick(x, r, ()=>true), r, wlLabel);
+    return {...c, tag:"해협·운하", prompt:`<span class="big">${esc(x.link)}</span>두 바다를 잇는 곳은?`, svgAfter:x.xy?wfeatSVG(x):null, explain:wlExplain(x)};
+  },
+  wlBelt(x, r){
+    const other = Object.entries(WBELT).filter(([g])=>g!==x.belt).flatMap(([g,l])=>l.map(n=>({n,g})));
+    const w = shuffle(other, r).slice(0,3);
+    const c = mk({n:x.ko, g:x.belt}, w, r, o=>({main:o.n}));
+    return {...c, tag:"대지형", prompt:`다음 중 <b>${esc(x.belt)}</b>에 속하는 것은?`,
+      explain:Object.entries(WBELT).map(([g,l])=>`<b>${esc(g)}</b> ${l.map(esc).join(" · ")}`).join("<br>")};
+  },
+  wlCont(x, r){
+    const w = wlPick(x, r, y=>y.cont!==x.cont && !(x.t==="산맥" && /우랄/.test(y.ko+x.ko)));
+    if(w.length<3) return x.xy? BUILD.wlMap(x, r) : BUILD.wlBelt(x, r);
+    const c = mk(x, w, r, y=>({main:y.ko, sub:y.cont}));
+    const c2 = {...c, choices:c.choices.map(ch=>({main:ch.main}))};
+    return {...c2, tag:x.t, prompt:`다음 중 <b>${esc(x.cont)}</b>에 있는 ${esc(x.t)}${josa(x.t.split("·").pop(),"는","은")}?`, svgAfter:x.xy?wfeatSVG(x):null,
+      explain:wlExplain(x)+`<br><span class="muted">${w.map(y=>`${esc(y.ko)} = ${esc(y.cont)}`).join(" / ")}</span>`};
+  },
+  wlCurClue(x, r){
+    const c = mk(x, wlPick(x, r, y=>y.grp!==x.grp), r, y=>({main:y.ko, sub:y.warm?"난류":"한류"}));
+    const c2 = {...c, choices:c.choices.map(ch=>({main:ch.main}))};
+    return {...c2, tag:"해류", prompt:`<span class="qtext">${esc(x.note)}</span>`, subPrompt:"이와 관련된 해류는?", svgAfter:x.xy?wfeatSVG(x):null, explain:wlExplain(x)};
+  },
+  wlWarm(x, r){
+    const w = shuffle(WLAND.filter(y=>y.t==="해류" && y.warm!==x.warm), r).slice(0,3);
+    const c = mk(x, w, r, wlLabel);
+    const kind = x.warm? "난류" : "한류";
+    return {...c, tag:"해류", prompt:`다음 중 <b>${kind}</b>${josa(kind,"는","은")}?`,
+      explain:`<b>난류</b> ${WLAND.filter(y=>y.t==="해류"&&y.warm).map(y=>esc(y.ko)).join(" · ")}<br><b>한류</b> ${WLAND.filter(y=>y.t==="해류"&&!y.warm).map(y=>esc(y.ko)).join(" · ")}`};
+  },
+
+  /* ── 세계 주요 통계 ── */
+  stTop(x, r){
+    const w = [...shuffle(x.ranks.slice(1), r), ...wsOutsiders(x, r, 3)].slice(0,3);
+    const c = mk(x.ranks[0], w, r, n=>({main:n}));
+    return {...c, tag:"통계 · "+x.cat, prompt:`<span class="big">${esc(x.ko)}</span>세계 1위 국가는?`, explain:wsExplain(x)};
+  },
+  stNotIn(x, r){
+    const out = wsOutsiders(x, r, 1)[0]; if(!out) return BUILD.stTop(x, r);
+    const c = mk(out, shuffle(x.ranks, r).slice(0,3), r, n=>({main:n}));
+    return {...c, tag:"통계 · "+x.cat, prompt:`<span class="big">${esc(x.ko)}</span>상위 ${x.ranks.length}개국에 <u>들지 않는</u> 나라는?`, explain:wsExplain(x)};
+  },
+  stWhich(x, r){
+    const sib = shuffle(WSTAT.filter(y=>y!==x && y.kind==="rank" && y.cat===x.cat && y.meas===x.meas && y.ranks.slice(0,3).join()!==x.ranks.slice(0,3).join()), r).slice(0,3);
+    if(sib.length<3) return BUILD.stTop(x, r);
+    const c = mk(x, sib, r, y=>({main:y.item}));
+    return {...c, tag:"통계 · "+x.cat, prompt:`<span class="qtext">${x.ranks.slice(0,3).map((n,i)=>`${circ(i)} ${esc(n)}`).join("  ")}</span>`, subPrompt:`${esc(x.meas||"")} 상위국이 이와 같은 품목은?`,
+      explain:wsExplain(x)+`<br><span class="muted">${sib.map(y=>`${esc(y.item)}: ${y.ranks.slice(0,3).map(esc).join("·")}`).join(" / ")}</span>`};
+  },
+  stMost(x, r){
+    let pick=null;
+    for(let t=0;t<30 && !pick;t++){
+      const cand = shuffle(x.rows.map((row,i)=>({row,i})), r).slice(0,4);
+      const best = cand.reduce((a,b)=> (x.hi? b.i<a.i : b.i>a.i) ? b : a);
+      if(cand.every(o=>o===best || o.row[1]!==best.row[1])) pick={cand,best};
+    }
+    const {cand,best} = pick;
+    const c = mk(best, cand.filter(o=>o!==best), r, o=>({main:o.row[0]}));
+    const lst = cand.slice().sort((a,b)=>a.i-b.i).map(o=>`${o===best?"<b>":""}${esc(o.row[0])} ${esc(o.row[1])}${x.unit||""}${o===best?"</b>":""}`).join(" · ");
+    return {...c, tag:"통계 · "+x.cat, prompt:`다음 중 <b>${esc(x.q)}</b> 나라는?`, explain:`${lst}<br><span class="muted">${esc(best.row[2]||"")}</span>`};
   },
 
   /* ── 연표 (한국어) ── */
@@ -1149,7 +1318,7 @@ function anSet(label){
   if(/일본 지리 · 지형/.test(l)) return setById("jp-land");
   return null;
 }
-const AN_ID = /, (?=(?:P\d{2}|L\d{3}|J\d{3}|G\d+|CL\d+|EV-\d+|K\d{4}-[\w-]+) )/;
+const AN_ID = /, (?=(?:P\d{2}|L\d{3}|J\d{3}|G\d+|CL\d+|EV-\d+|WL\d{3}|WS\d{3}|K\d{4}-[\w-]+) )/;
 function anParse(head, rows){
   const H=head.map(h=>String(h).trim());
   const col=(re,def)=>{ const i=H.findIndex((h,k)=>k>0 && re.test(h)); return i>=0? i : def; };
