@@ -433,21 +433,21 @@ const conW = x => 1;
 const SETS = [
   {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", composite:[
       {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
-      {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-climate","g-land","g-stat"]},
+      {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]},
       {label:"일본 연표", share:.15, sets:["jp-his"]},
       {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
       {label:"개념", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
     ], pool:()=>[...PREFS, ...JPH, ...(CONFIG.worldChrono? WORLD : []), ...LAND, ...CON, ...CTRY, ...CLIM, ...WLAND, ...WSTAT]},
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
-  {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"도도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
-  {id:"jp-feature", group:"일본 지리", subj:"geo", name:"도도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
+  {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"토도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
+  {id:"jp-feature", group:"일본 지리", subj:"geo", name:"토도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
   {id:"jp-capital", group:"일본 지리", subj:"geo", name:"현청소재지",     pool:()=>PREFS, w:p=>p.n===13?0:(p.diff?5:0.6), kinds:["prefCapital","capitalPref","mapCapital"]},
-  {id:"jp-land",    group:"일본 지리", subj:"geo", name:"지형",           pool:()=>LANDC, w:x=>1, kinds:x=>x.xy ? ["landMap","landMap","landPref","prefLand"] : ["landPref","landPref","prefLand"]},
+  {id:"jp-land",    group:"일본 지리", subj:"geo", name:"일본 지형",           pool:()=>LANDC, w:x=>1, kinds:x=>x.xy ? ["landMap","landMap","landPref","prefLand"] : ["landPref","landPref","prefLand"]},
   {id:"g-country",  group:"세계 지리", subj:"geo", name:"나라 위치", pool:()=>CTRY.filter(c=>WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryMap"]},
   {id:"g-capital",  group:"세계 지리", subj:"geo", name:"수도", pool:()=>CTRY.filter(c=>c.cap && WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryCapital","capitalCountry"]},
   {id:"g-feature",  group:"세계 지리", subj:"geo", name:"나라의 특징", pool:()=>CTRY.filter(c=>c.hint), w:c=>c.core?2:1, kinds:["countryHint"]},
-  {id:"g-climate",  group:"세계 지리", subj:"geo", name:"기후 그래프(쾨펜)", pool:()=>CLIM, w:x=>1, kinds:["climOndo","climHyther","climCity"]},
-  {id:"g-land",     group:"세계 지리", subj:"geo", name:"자연지리(지형)", pool:()=>WLAND, w:x=>x.t==="해류"||x.t==="해협·운하"?1.5:1, kinds:wlKinds},
+  {id:"g-land",     group:"세계 지리", subj:"geo", name:"세계 지형", pool:()=>WLAND, w:x=>x.t==="해류"||x.t==="해협·운하"?1.5:1, kinds:wlKinds},
+  {id:"g-climate",  group:"세계 지리", subj:"geo", name:"기후 그래프", pool:()=>CLIM, w:x=>1, kinds:["climOndo","climHyther","climCity"]},
   {id:"g-stat",     group:"세계 지리", subj:"geo", name:"주요 통계", pool:()=>WSTAT, w:x=>x.kind==="most"?3:(x.cat==="농산물"||x.cat==="에너지 자원"?1.2:1), kinds:wsKinds},
   {id:"jp-his",     group:"일본 연표", subj:"his", name:"일본 관련 연표", pool:()=>JPH, w:e=>GW[e.g]||1, kinds:"chrono"},
   {id:"w-pol", group:"세계 연표", subj:"pol", name:"정치",     pool:()=>WORLD.filter(e=>e.f==="정치"),     w:e=>GW[e.g]||1, kinds:"chrono"},
@@ -681,7 +681,7 @@ const BUILD = {
     const clues = prefClues(p);
     const w = prefDistractors(p, r, 3, q=>!clueConflict(p, q));
     const c = mk(p, w, r, prefLabel);
-    return {...c, tag:"도도부현 특징", prompt:`<span class="qtext">${clues.map(esc).join("<br>")}</span>`, subPrompt:"이 설명에 해당하는 도도부현은?", explain:prefExplain(p), mapAfter:[p.n]};
+    return {...c, tag:"토도부현 특징", prompt:`<span class="qtext">${clues.map(esc).join("<br>")}</span>`, subPrompt:"이 설명에 해당하는 토도부현은?", explain:prefExplain(p), mapAfter:[p.n]};
   },
   landPref(x, r){
     const p = prefByN(pick(x.p, r));
@@ -1313,7 +1313,7 @@ function anIndex(){
 }
 const AN_LABEL = (()=>{ const m={}; SETS.forEach(s=>{ m[setLabel(s)]=s; }); return m; })();
 function anSet(label){
-  let l=String(label||"").replace(/^연습 · /,"").trim().replace(/^개념\(기출\)/,"개념").replace("도도부현 위치","도도부현");
+  let l=String(label||"").replace(/^연습 · /,"").trim().replace(/^개념\(기출\)/,"개념").replace("도도부현 위치","토도부현").replace("도도부현","토도부현").replace("자연지리(지형)","세계 지형").replace("기후 그래프(쾨펜)","기후 그래프");
   if(AN_LABEL[l]) return AN_LABEL[l];
   if(/일본 지리 · 지형/.test(l)) return setById("jp-land");
   return null;
