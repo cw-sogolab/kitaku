@@ -63,7 +63,7 @@ button{font:inherit;color:inherit}
 
 /* top bar */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:transparent;margin-inline:-16px;padding:12px 16px 6px;display:flex;align-items:center;gap:12px}
-.logo{font-family:"Dela Gothic One",var(--f-ja);font-size:20px;font-weight:400;letter-spacing:.02em;display:flex;align-items:center;gap:8px;white-space:nowrap;color:var(--ink)}
+.logo{text-decoration:none;cursor:pointer;font-family:"Dela Gothic One",var(--f-ja);font-size:20px;font-weight:400;letter-spacing:.02em;display:flex;align-items:center;gap:8px;white-space:nowrap;color:var(--ink)}
 .logo i{display:none}
 .nav{margin-left:auto;display:flex;gap:4px;background:var(--card);border:1px solid var(--card-line);border-radius:999px;padding:3px;box-shadow:var(--shadow)}
 .nav[hidden]{display:none}
@@ -359,7 +359,7 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 </head>
 <body>
 <header class="top">
-  <div class="logo"><i></i>帰宅クイズ</div>
+  <a class="logo" id="logo" href="./" aria-label="帰宅クイズ 처음 화면으로"><i></i>帰宅クイズ</a>
   <nav class="nav" aria-label="화면 전환">
     <button id="nav-student" aria-pressed="true">학생</button>
     <button id="nav-teacher" aria-pressed="false" hidden>강사</button>
@@ -940,6 +940,10 @@ let entry = {cls: params.get("c") || store.get("lastCls", preset.c), name: store
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
+$("#logo").onclick = e=>{ e.preventDefault();
+  if(S && !S.done && (view==="quiz" || view==="lap") && !confirm("처음 화면으로 갈까요? 풀던 퀴즈는 처음부터 다시 풀어야 해요.")) return;
+  if(location.hash) history.replaceState(null, "", location.pathname+location.search);
+  S=null; go(home()); };
 $("#nav-student").onclick = ()=>{ if(view==="teacher") go(S&&!S.done? "quiz" : home()); };
 $("#nav-teacher").onclick = ()=>go(tUnlocked() ? "teacher" : "pin");
 window.addEventListener("hashchange", ()=>{ if(location.hash==="#teacher") go(tUnlocked() ? "teacher" : "pin"); });
