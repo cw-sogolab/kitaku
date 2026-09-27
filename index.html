@@ -259,6 +259,7 @@ th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-
 th{font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:700}
 td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+.linkbtn{border:0;background:none;padding:0;margin-left:6px;color:var(--go);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
 .worst{display:flex;flex-direction:column;gap:6px;font-size:13px}
 .worst div{display:flex;gap:8px}
 .worst .c{margin-left:auto;font-family:var(--f-mono);color:var(--stop)}
@@ -370,6 +371,7 @@ const D = window.KITAKU_DATA;
 /* ───────── 설정 (배포 때 여기만 고치면 됨) ───────── */
 const CONFIG = {
   defaultN: 20,
+  worldChrono: false,              // 세계 연표 범위 공개 여부 (자료 작업 끝나면 true 로)
   plannedBase: "https://cw-sogolab.github.io/kitaku/",
   statsUrl: "",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
   secret: "kitaku-2026",
@@ -427,7 +429,7 @@ const SETS = [
       {label:"일본 연표", share:.15, sets:["jp-his"]},
       {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
       {label:"개념", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
-    ], pool:()=>[...PREFS, ...JPH, ...WORLD, ...LAND, ...CON, ...CTRY, ...CLIM]},
+    ], pool:()=>[...PREFS, ...JPH, ...(CONFIG.worldChrono? WORLD : []), ...LAND, ...CON, ...CTRY, ...CLIM]},
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
   {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"도도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
   {id:"jp-feature", group:"일본 지리", subj:"geo", name:"도도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
@@ -451,7 +453,13 @@ const SETS = [
   {id:"c-geo", group:"개념", subj:"geo", name:"지리",     pool:()=>CON.filter(x=>x.subj==="지리"),     w:conW, kinds:["concept"]},
   {id:"c-all", group:"개념", subj:"con", name:"전 과목",  pool:()=>CON, w:conW, kinds:["concept"]},
 ];
+if(!CONFIG.worldChrono){   // 세계 연표: 준비 중 — 범위 선택에서 막고 통합본에서도 뺌(나머지 비율로 다시 나눔)
+  SETS.forEach(s=>{ if(s.group==="세계 연표") s.soon="준비 중"; });
+  const all=SETS[0]; all.composite=all.composite.filter(p=>p.label!=="세계 연표");
+  const t=all.composite.reduce((a,p)=>a+p.share,0); all.composite.forEach(p=>p.share=p.share/t);
+}
 const setById = id => SETS.find(s=>s.id===id) || SETS[0];
+const okSet = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon ? id : "all"; };
 const setLabel = s => s.composite ? "통합본" : s.group+" · "+s.name;
 
 /* ───────── 지도 ───────── */
@@ -754,6 +762,7 @@ if(params.get("set")){ preset = {set:params.get("set"), n:+params.get("n")||CONF
 // QR(주소에 set=)로 들어왔거나 오늘 받은 세트가 있으면 수업 모드, 아니면 혼자 연습 모드
 let mode = (params.get("set") || preset.date===today()) ? "class" : "practice";
 let prac = store.get("prac", {set:"all", n:10});
+preset.set = okSet(preset.set); prac.set = okSet(prac.set);
 const home = () => mode==="class" ? "entry" : "practice";
 let S = null;         // 퀴즈 진행 상태
 const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
@@ -1100,7 +1109,7 @@ function renderTeacher(){
         </section>
         <section class="card" style="display:flex;flex-direction:column;gap:12px">
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2 style="font-size:16px">오늘 퇴실 기록</h2><span class="muted" style="font-size:12px">${log.length}명</span></div>
-          <div class="note">여기에는 이 기기에서 푼 기록만 보입니다. 학생들 결과는 구글 폼을 연결하면 시트에 쌓입니다.</div>
+          <div class="note">여기에는 이 기기에서 푼 기록만 보여요. 학생 전체 기록은 「학생 분석」 탭에서 보세요. <button class="linkbtn" id="clear-local">이 기기 기록 비우기</button></div>
           ${log.length? `<div class="tbl"><table><thead><tr><th>시각</th><th>이름</th><th>반</th><th>세트</th><th>첫 시도</th><th>시도</th><th>시간</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">아직 기록이 없어요. 학생 화면에서 한 세트를 끝까지 풀어보세요.</div>`}
           ${worst.length? `<div class="field"><span class="lbl">첫 시도에 많이 틀린 문항</span><div class="worst">${worst.map(w=>`<div><span>${esc(w.name)}</span><span class="c">${w.c}명</span></div>`).join("")}</div></div>`:""}
         </section>
@@ -1114,6 +1123,8 @@ function bindTeacher(){
   document.querySelectorAll("[data-tcls]").forEach(b=>b.onclick=()=>{ tstate.cls=b.dataset.tcls; render(); });
   document.querySelectorAll("[data-tn]").forEach(b=>b.onclick=()=>{ tstate.n=+b.dataset.tn; render(); });
   document.querySelectorAll('input[name="set"]').forEach(x=>x.onchange=()=>{ tstate.set=x.value; render(); });
+  $("#clear-local").onclick=()=>{ if(!confirm("이 기기에 저장된 풀이 기록(오늘 퇴실 기록·지난 점수)을 모두 지울까요? 시트 기록은 그대로예요.")) return;
+    try{ Object.keys(localStorage).filter(k=>/^kitaku\.(log|hist\.|phist\.)/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){} render(); };
   $("#preview").onclick=()=>{ preset={...tstate, date:today()}; store.set("preset2", preset); mode="class"; entry={cls:tstate.cls, name:null}; S=null; go("entry"); };
   const box=$("#qr");
   if(window.QRCode){ try{ new QRCode(box,{text:studentURL(),width:400,height:400,colorDark:"#15211C",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M}); }catch(e){ box.textContent="QR 생성 실패"; } }
@@ -1121,7 +1132,7 @@ function bindTeacher(){
 }
 
 /* ───────── 강사 화면 · 학생 분석 (시트 기록 → Apps Script 웹 앱 → 여기) ───────── */
-const AN_GROUPS = ["일본 지리","세계 지리","일본 연표","세계 연표","개념"];
+const AN_GROUPS = ["일본 지리","세계 지리","일본 연표","세계 연표","개념"].filter(g=>CONFIG.worldChrono || g!=="세계 연표");
 const AN = { raw:null, recs:null, at:null, err:null, loading:false, cls:"전체", kind:"all", days:30, sort:"low", stu:null, setup:false };
 function anConf(){ return { url: store.get("an.url", CONFIG.statsUrl||""), key: store.get("an.key", "") }; }
 let AN_IDX = null;   // 문항 ID → {g: 영역, label}
