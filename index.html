@@ -1340,12 +1340,18 @@ function jsonp(url, ok, fail, ms=15000){
   window[cb]=d=>{ end(); ok(d); }; sc.onerror=()=>{ end(); fail(); };
   sc.src=url+(url.includes("?")?"&":"?")+"callback="+cb; document.head.appendChild(sc);
 }
+// 구글 계정 여러 개로 로그인된 브라우저에선 <script>(JSONP)가 쿠키 때문에 막힐 수 있어서, 먼저 쿠키 없이 fetch → 안 되면 JSONP
+function getJSON(url, ok, fail){
+  const ctl = window.AbortController? new AbortController() : null; const tm=setTimeout(()=>ctl&&ctl.abort(), 15000);
+  fetch(url, {credentials:"omit", cache:"no-store", signal:ctl?ctl.signal:undefined}).then(r=>{ if(!r.ok) throw 0; return r.json(); })
+    .then(d=>{ clearTimeout(tm); ok(d); }).catch(()=>{ clearTimeout(tm); jsonp(url, ok, fail); });
+}
 function rankUrl(){ return CONFIG.statsUrl || store.get("an.url", ""); }
 function rankLoad(force){
   const url=rankUrl(); if(!url){ RK.err="none"; render(); return; }
   if(!force){ try{ const c=JSON.parse(sessionStorage.getItem("kitaku.rank")||"null"); if(c && Date.now()-c.t<180000){ RK.data=c.d; RK.at=c.t; render(); return; } }catch(e){} }
   RK.loading=true; RK.err=null; render();
-  jsonp(url+(url.includes("?")?"&":"?")+"mode=rank", d=>{ RK.loading=false; if(d && d.ok){ RK.data=d; RK.at=Date.now(); try{ sessionStorage.setItem("kitaku.rank", JSON.stringify({t:RK.at, d})); }catch(e){} } else RK.err="net"; render(); },
+  getJSON(url+(url.includes("?")?"&":"?")+"mode=rank", d=>{ RK.loading=false; if(d && d.ok){ RK.data=d; RK.at=Date.now(); try{ sessionStorage.setItem("kitaku.rank", JSON.stringify({t:RK.at, d})); }catch(e){} } else RK.err="net"; render(); },
     ()=>{ RK.loading=false; RK.err="net"; render(); });
 }
 function openRank(kind, back){ RK.kind=kind; RK.back=back; if(!RK.cls) RK.cls = entry.cls || preset.c || "전체"; go("rank"); window.scrollTo(0,0); }
@@ -1504,16 +1510,10 @@ function anLoad(force){
   if(!url || !key){ AN.setup=true; render(); return; }
   if(!force && !AN.recs){ try{ const c=JSON.parse(sessionStorage.getItem("kitaku.an")||"null"); if(c){ AN.raw=c; AN.recs=anParse(c.head,c.rows); AN.at=new Date(c.at); render(); return; } }catch(e){} }
   AN.loading=true; AN.err=null; render();
-  const cb="__kq"+Date.now(), sc=document.createElement("script");
-  const end=()=>{ clearTimeout(tm); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } sc.remove(); AN.loading=false; };
-  const tm=setTimeout(()=>{ end(); AN.err="net"; render(); }, 20000);
-  window[cb]=d=>{ end();
+  getJSON(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(key), d=>{ AN.loading=false;
     if(!d || !d.ok){ AN.err = d && d.error==="key" ? "key" : "net"; }
     else { AN.raw=d; AN.recs=anParse(d.head, d.rows); AN.at=new Date(d.at||Date.now()); AN.setup=false; try{ sessionStorage.setItem("kitaku.an", JSON.stringify(d)); }catch(e){} }
-    render(); };
-  sc.onerror=()=>{ end(); AN.err="net"; render(); };
-  sc.src=url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(key)+"&callback="+cb;
-  document.head.appendChild(sc);
+    render(); }, ()=>{ AN.loading=false; AN.err="net"; render(); });
 }
 
 /* 집계 */
