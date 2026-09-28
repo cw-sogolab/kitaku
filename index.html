@@ -329,6 +329,19 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .setup .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .pick.mono{font-family:var(--f-mono);font-size:14px}
 @media (max-width:760px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .abar{grid-template-columns:64px minmax(0,1fr) 84px} }
+
+/* 랭킹 */
+.linkrow{display:flex;justify-content:center;gap:6px 18px;flex-wrap:wrap}
+.linkrow .linkbtn{margin:0}
+.podiums{display:flex;flex-direction:column;gap:10px}
+.podium{display:grid;grid-template-columns:44px 1fr auto;grid-template-rows:auto auto;align-items:center;column-gap:12px;background:var(--card);border:1px solid var(--card-line);border-radius:20px;padding:14px 16px;box-shadow:var(--shadow)}
+.podium .md{grid-row:1/3;font-size:34px;line-height:1;text-align:center}
+.podium .nm{font-size:18px;font-weight:700}
+.podium .acc{grid-row:1/3;grid-column:3;font-family:var(--f-mono);font-size:22px;font-weight:500;color:var(--go)}
+.podium .sub{font-size:12px;color:var(--muted)}
+.podium.p1{background:linear-gradient(120deg,var(--go-soft),var(--card));border-color:var(--go-2)}
+.podium.p1 .nm{font-size:21px}
+.podium.empty{opacity:.6;box-shadow:none}
 /* 휴대폰(가로 430px 이하): 글자·여백 조금 줄임 */
 @media (max-width:430px){
   body{font-size:14px}
@@ -994,11 +1007,12 @@ function renderEntry(){
       ${hist.length?`<div class="muted" style="font-size:13px">지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
     <button class="btn" id="start" ${entry.name?"":"disabled"}>${entry.name? "시작하기" : "이름을 먼저 입력하세요"}</button>
-    <div style="text-align:center"><button class="linkbtn" id="to-prac">집에서 혼자 연습하기 →</button></div>
+    <div class="linkrow"><button class="linkbtn" id="to-rank">🏆 퇴실 퀴즈 랭킹 →</button><button class="linkbtn" id="to-prac">집에서 혼자 연습하기 →</button></div>
   </div>`;
 }
 function bindEntry(){
   const tp=$("#to-prac"); if(tp) tp.onclick=()=>{ mode="practice"; go("practice"); };
+  const tr=$("#to-rank"); if(tr) tr.onclick=()=>openRank("cls", "entry");
   document.querySelectorAll("[data-cls]").forEach(b=>b.onclick=()=>{ entry.cls=b.dataset.cls; render(); });
   const ni=$("#name"), st0=$("#start");
   if(ni){ ni.oninput=()=>{ entry.name=ni.value.trim().replace(/\s+/g," ")||null; st0.disabled=!entry.name; st0.textContent=entry.name?"시작하기":"이름을 먼저 입력하세요"; };
@@ -1031,7 +1045,7 @@ function renderPractice(){
       ${hist.length?`<div class="muted" style="font-size:13px">이 범위 지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
     <button class="btn" id="start" ${entry.name?"":"disabled"}>${entry.name? "연습 시작" : "이름을 먼저 입력하세요"}</button>
-    <div style="text-align:center"><button class="linkbtn" id="to-mine">내 기록 보기 →</button></div>
+    <div class="linkrow"><button class="linkbtn" id="to-mine">내 기록 보기 →</button><button class="linkbtn" id="to-rank">🏆 연습 랭킹 →</button></div>
     ${hasClass?`<div style="text-align:center"><button class="linkbtn" id="to-class">오늘 퇴실 퀴즈로 →</button></div>`:`<p class="muted" style="text-align:center;font-size:12px">수업 퇴실 퀴즈는 선생님이 띄운 QR로 들어오세요.</p>`}
   </div>`;
 }
@@ -1044,6 +1058,7 @@ function bindPractice(){
   st0.onclick=()=>startQuiz(true);
   const tc=$("#to-class"); if(tc) tc.onclick=()=>{ mode="class"; go("entry"); };
   $("#to-mine").onclick=()=>openMine("practice");
+  $("#to-rank").onclick=()=>openRank("prac", "practice");
 }
 
 function startQuiz(practice){
@@ -1210,7 +1225,7 @@ function renderTicket(){
     </div>
     <p class="sent">${S.sent?"결과가 선생님 시트로 전송됐어요.":"결과는 이 기기에 저장됐어요."}<br>문 앞에서 이 화면을 선생님께 보여주세요.</p>
     <button class="btn ghost" id="again">처음 화면으로</button>
-    <div style="text-align:center"><button class="linkbtn" id="to-mine">내 기록 보기 →</button></div>
+    <div class="linkrow"><button class="linkbtn" id="to-mine">내 기록 보기 →</button><button class="linkbtn" id="to-rank">🏆 퇴실 퀴즈 랭킹 →</button></div>
   </div>`;
 }
 function renderResult(){
@@ -1235,18 +1250,20 @@ function renderResult(){
     <p class="sent">${S.sent?"연습 기록이 선생님 시트에 「연습」으로 저장됐어요.":"연습 기록은 이 폰에 저장됐어요."} 퇴실증이 아니에요.</p>
     <button class="btn" id="again-same">같은 범위 한 번 더</button>
     <button class="btn ghost" id="again">다른 범위 고르기</button>
-    <div style="text-align:center"><button class="linkbtn" id="to-mine">내 기록 보기 →</button></div>
+    <div class="linkrow"><button class="linkbtn" id="to-mine">내 기록 보기 →</button><button class="linkbtn" id="to-rank">🏆 연습 랭킹 →</button></div>
   </div>`;
 }
 function bindResult(){
   $("#again-same").onclick=()=>startQuiz(true);
   $("#again").onclick=()=>{ S=null; go("practice"); };
   $("#to-mine").onclick=()=>{ S=null; openMine("practice"); };
+  $("#to-rank").onclick=()=>{ S=null; openRank("prac", "practice"); };
 }
 function bindTicket(){
   clockTimer=setInterval(()=>{ const c=$("#clock"); if(c) c.textContent=fmtTime(new Date()); },1000);
   $("#again").onclick=()=>{ S=null; go(home()); };
   $("#to-mine").onclick=()=>{ clearInterval(clockTimer); openMine(home()); };
+  $("#to-rank").onclick=()=>{ clearInterval(clockTimer); openRank("cls", home()); };
 }
 
 
@@ -1310,6 +1327,58 @@ function bindMine(){
   const sel=$("#mine-name"); if(sel) sel.onchange=()=>{ mineName=sel.value; render(); };
 }
 function openMine(from){ mineBack=from; go("mine"); window.scrollTo(0,0); }
+
+
+/* ───────── 랭킹 (시트 → Apps Script ?mode=rank, 상위 3명만 공개) ───────── */
+const RK = { data:null, at:0, loading:false, err:null, kind:"prac", per:"week", cls:null, back:null };
+function jsonp(url, ok, fail, ms=15000){
+  const cb="__kq"+Date.now()+Math.floor(Math.random()*1e4), sc=document.createElement("script");
+  const end=()=>{ clearTimeout(tm); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } sc.remove(); };
+  const tm=setTimeout(()=>{ end(); fail(); }, ms);
+  window[cb]=d=>{ end(); ok(d); }; sc.onerror=()=>{ end(); fail(); };
+  sc.src=url+(url.includes("?")?"&":"?")+"callback="+cb; document.head.appendChild(sc);
+}
+function rankUrl(){ return CONFIG.statsUrl || store.get("an.url", ""); }
+function rankLoad(force){
+  const url=rankUrl(); if(!url){ RK.err="none"; render(); return; }
+  if(!force){ try{ const c=JSON.parse(sessionStorage.getItem("kitaku.rank")||"null"); if(c && Date.now()-c.t<180000){ RK.data=c.d; RK.at=c.t; render(); return; } }catch(e){} }
+  RK.loading=true; RK.err=null; render();
+  jsonp(url+(url.includes("?")?"&":"?")+"mode=rank", d=>{ RK.loading=false; if(d && d.ok){ RK.data=d; RK.at=Date.now(); try{ sessionStorage.setItem("kitaku.rank", JSON.stringify({t:RK.at, d})); }catch(e){} } else RK.err="net"; render(); },
+    ()=>{ RK.loading=false; RK.err="net"; render(); });
+}
+function openRank(kind, back){ RK.kind=kind; RK.back=back; if(!RK.cls) RK.cls = entry.cls || preset.c || "전체"; go("rank"); window.scrollTo(0,0); }
+function renderRank(){
+  const prac = RK.kind==="prac";
+  const back=`<button class="btn small ghost" id="rk-back" style="align-self:flex-start">← 돌아가기</button>`;
+  const head=`<section class="card setcard" style="gap:6px"><div class="stk s1">🏆</div><div class="stk s2">☆</div>
+      <span class="eyebrow">첫 시도 정답률 TOP 3</span><h1>${prac? "연습 랭킹" : "퇴실 퀴즈 랭킹"}</h1></section>`;
+  const perSeg=`<div class="seg" role="group" aria-label="기간">${[["week","이번 주"],["month","이번 달"]].map(([k,t])=>`<button data-rper="${k}" aria-pressed="${k===RK.per}">${t}</button>`).join("")}</div>`;
+  const clsSeg= prac? "" : `<div class="seg" role="group" aria-label="반">${["전체", ...Object.keys(CONFIG.classes)].map(c=>`<button data-rcls="${esc(c)}" aria-pressed="${c===RK.cls}">${esc(c)}</button>`).join("")}</div>`;
+  let body;
+  if(RK.err==="none") body=`<section class="card an-msg">랭킹은 곧 열려요!</section>`;
+  else if(RK.err) body=`<section class="card an-msg">랭킹을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.<br><button class="linkbtn" id="rk-retry">다시 불러오기</button></section>`;
+  else if(!RK.data) body=`<section class="card an-msg">불러오는 중…</section>`;
+  else {
+    const key = prac? `prac|${RK.per}` : `cls|${RK.cls}|${RK.per}`;
+    const L = RK.data.lists[key] || {n:0, total:0, top:[]}, min=RK.data.min||{};
+    const medal=["🥇","🥈","🥉"];
+    const cards=[0,1,2].map(i=>{ const x=L.top[i];
+      return x? `<div class="podium p${i+1}"><span class="md">${medal[i]}</span><b class="nm">${esc(x.name)}</b><span class="acc">${x.acc}%</span><span class="sub">${prac? `${x.q}문항` : `${x.c}회 · ${x.q}문항`}</span></div>`
+              : `<div class="podium p${i+1} empty"><span class="md">${medal[i]}</span><span class="nm muted">도전자를 기다려요</span></div>`; }).join("");
+    const cond = prac? `연습 ${min.prac||30}문항 이상` : `퇴실 퀴즈 ${RK.per==="week"? (min.clsWeek||1) : (min.clsMonth||3)}회 이상`;
+    const since = RK.per==="week"? RK.data.weekStart : RK.data.monthStart;
+    body=`<div class="podiums">${cards}</div>
+      <p class="hint" style="text-align:center">${since? `${esc(since.slice(5).replace("-","/"))}부터 · ` : ""}${cond} 푼 사람 ${L.n}명 중 · 첫 시도 정답률이 같으면 더 많이 푼 사람이 위<br>${fmtTime(new Date(RK.at)).slice(0,5)} 기준 (몇 분마다 갱신)</p>`;
+  }
+  return `<div class="wrap">${back}${head}${perSeg}${clsSeg}${body}</div>`;
+}
+function bindRank(){
+  $("#rk-back").onclick=()=>{ const b=RK.back||home(); RK.back=null; go(b); };
+  document.querySelectorAll("[data-rper]").forEach(b=>b.onclick=()=>{ RK.per=b.dataset.rper; render(); });
+  document.querySelectorAll("[data-rcls]").forEach(b=>b.onclick=()=>{ RK.cls=b.dataset.rcls; render(); });
+  const rt=$("#rk-retry"); if(rt) rt.onclick=()=>rankLoad(true);
+  if(!RK.data && !RK.loading && !RK.err) rankLoad(false);
+}
 
 /* ───────── 강사 화면 ───────── */
 let tstate = {cls:preset.c, set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem("kitaku.ttab")||"set"; }catch(e){ return "set"; } })()};
@@ -1611,6 +1680,7 @@ function render(){
   else if(view==="ticket" && S){ app.innerHTML=renderTicket(); bindTicket(); }
   else if(view==="result" && S){ app.innerHTML=renderResult(); bindResult(); }
   else if(view==="mine"){ app.innerHTML=renderMine(); bindMine(); }
+  else if(view==="rank"){ app.innerHTML=renderRank(); bindRank(); }
   else if(view==="practice" || (view!=="entry" && mode==="practice")){ view="practice"; app.innerHTML=renderPractice(); bindPractice(); }
   else { view="entry"; app.innerHTML=renderEntry(); bindEntry(); }
 }
