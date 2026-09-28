@@ -54,7 +54,8 @@ function rank_() {
   const add = (k, key, name, f, q, t) => { const m = agg[k] || (agg[k] = {}); const x = m[key] || (m[key] = { name: name, f: 0, q: 0, c: 0, t: 0 }); x.name = name; x.f += f; x.q += q; x.c++; x.t += t; };
   vals.forEach(r => {
     if (!(r[0] instanceof Date)) return;
-    const name = String(r[C.name] || "").trim(), key = name.replace(/\s+/g, ""); if (!key || skip.has(key)) return;
+    const name = String(r[C.name] || "").trim(), key = name.replace(/\s+/g, "");
+    if (!key || skip.has(key) || !/^[가-힣A-Za-z]{2,}$/.test(key)) return;   // 「.」「기ㅁ현수」처럼 잘못 친 이름은 랭킹에서 제외
     let sc = r[C.first]; if (sc instanceof Date) sc = Utilities.formatDate(sc, tz, "M/d");
     const m = String(sc).match(/(\d+)\s*\/\s*(\d+)/); if (!m || !+m[2]) return;
     const cls = String(r[C.cls] || "").trim(), prac = cls === "연습" || /^연습 · /.test(String(r[C.set] || ""));

@@ -392,7 +392,7 @@ const CONFIG = {
   defaultN: 20,
   worldChrono: false,              // 세계 연표 범위 공개 여부 (자료 작업 끝나면 true 로)
   plannedBase: "https://cw-sogolab.github.io/kitaku/",
-  statsUrl: "",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
+  statsUrl: "https://script.google.com/macros/s/AKfycbytdU_JiEpriYaMUKX3H9mpm0TjdFJ29Nu-zDm1QGyUQ7SWRdYahyf2_FujMYDMzZ08/exec",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
   secret: "kitaku-2026",
   teacherPinHash: 189797738,       // 강사 화면 PIN의 hashStr 값 (초기 PIN 7350). 바꾸려면 콘솔에서 hashStr("새PIN") 실행 후 여기 붙여넣기
   classes: { "토일반": [], "화목반": [] },   // 반 이름 (학생 이름은 본인이 입력)
@@ -482,6 +482,8 @@ if(!CONFIG.worldChrono){   // 세계 연표: 준비 중 — 범위 선택에서 
   const t=all.composite.reduce((a,p)=>a+p.share,0); all.composite.forEach(p=>p.share=p.share/t);
 }
 const setById = id => SETS.find(s=>s.id===id) || SETS[0];
+// 이름: 완성된 한글(또는 영문) 2~20자만 — 「.」 「기ㅁ현수」처럼 잘못 친 이름은 시작 버튼이 안 눌림
+const okName = v => /^[가-힣A-Za-z][가-힣A-Za-z ]{1,19}$/.test(v||"");
 const okSet = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon ? id : "all"; };
 const setLabel = s => s.composite ? "통합본" : s.group+" · "+s.name;
 
@@ -949,7 +951,7 @@ const home = () => mode==="class" ? "entry" : "practice";
 let S = null;         // 퀴즈 진행 상태
 const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
 let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : home();
-let entry = {cls: params.get("c") || store.get("lastCls", preset.c), name: store.get("lastName", null)};
+let entry = {cls: params.get("c") || store.get("lastCls", preset.c), name: store.get("lastName", null)}; if(!okName(entry.name)) entry.name=null;
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
@@ -1015,7 +1017,7 @@ function bindEntry(){
   const tr=$("#to-rank"); if(tr) tr.onclick=()=>openRank("cls", "entry");
   document.querySelectorAll("[data-cls]").forEach(b=>b.onclick=()=>{ entry.cls=b.dataset.cls; render(); });
   const ni=$("#name"), st0=$("#start");
-  if(ni){ ni.oninput=()=>{ entry.name=ni.value.trim().replace(/\s+/g," ")||null; st0.disabled=!entry.name; st0.textContent=entry.name?"시작하기":"이름을 먼저 입력하세요"; };
+  if(ni){ ni.oninput=()=>{ const v=ni.value.trim().replace(/\s+/g," "); entry.name=okName(v)? v : null; st0.disabled=!entry.name; st0.textContent=entry.name?"시작하기":(v?"이름을 정확히 써 주세요 (예: 김하늘)":"이름을 먼저 입력하세요"); };
           ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(); }; }
   const st=$("#start"); if(st) st.onclick=()=>startQuiz(false);
 }
@@ -1053,7 +1055,7 @@ function bindPractice(){
   $("#psel").onchange=e=>{ prac={...prac, set:e.target.value}; store.set("prac", prac); render(); };
   document.querySelectorAll("[data-pn]").forEach(b=>b.onclick=()=>{ prac={...prac, n:+b.dataset.pn}; store.set("prac", prac); render(); });
   const ni=$("#name"), st0=$("#start");
-  ni.oninput=()=>{ entry.name=ni.value.trim().replace(/\s+/g," ")||null; st0.disabled=!entry.name; st0.textContent=entry.name?"연습 시작":"이름을 먼저 입력하세요"; };
+  ni.oninput=()=>{ const v=ni.value.trim().replace(/\s+/g," "); entry.name=okName(v)? v : null; st0.disabled=!entry.name; st0.textContent=entry.name?"연습 시작":(v?"이름을 정확히 써 주세요 (예: 김하늘)":"이름을 먼저 입력하세요"); };
   ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(true); };
   st0.onclick=()=>startQuiz(true);
   const tc=$("#to-class"); if(tc) tc.onclick=()=>{ mode="class"; go("entry"); };
@@ -1360,7 +1362,7 @@ function renderRank(){
   else if(!RK.data) body=`<section class="card an-msg">불러오는 중…</section>`;
   else {
     const key = prac? `prac|${RK.per}` : `cls|${RK.cls}|${RK.per}`;
-    const L = RK.data.lists[key] || {n:0, total:0, top:[]}, min=RK.data.min||{};
+    const L0 = RK.data.lists[key] || {n:0, total:0, top:[]}, min=RK.data.min||{}; const L = {...L0, top:(L0.top||[]).filter(x=>okName(String(x.name).trim()))};
     const medal=["🥇","🥈","🥉"];
     const cards=[0,1,2].map(i=>{ const x=L.top[i];
       return x? `<div class="podium p${i+1}"><span class="md">${medal[i]}</span><b class="nm">${esc(x.name)}</b><span class="acc">${x.acc}%</span><span class="sub">${prac? `${x.q}문항` : `${x.c}회 · ${x.q}문항`}</span></div>`
