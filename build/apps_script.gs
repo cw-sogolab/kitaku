@@ -8,7 +8,7 @@
  * KEY 를 아는 사람만 기록을 볼 수 있습니다. KEY 를 바꾸면 「배포 관리 → 편집 → 새 버전」으로 다시 배포하세요.
  * 코드를 고친 뒤에는 항상 「배포 → 배포 관리 → ✏️ 편집 → 버전: 새 버전 → 배포」 (URL은 그대로 유지됨)
  *
- * ?mode=rank (키 없이 공개): 학생 화면 랭킹용 — 이번 주·이번 달 첫 시도 정답률 상위 3명의 이름·정답률만 돌려줌
+ * ?mode=rank (키 없이 공개): 학생 화면 랭킹용 — 이번 주·이번 달 첫 시도 정답률 상위 3명의 이름·정답률만 돌려줌 (1분마다 새로 계산)
  */
 const KEY = "여기에-비밀-키";   // 실제 키는 저장소에 올리지 말 것
 
@@ -75,7 +75,7 @@ function rank_() {
     ok.sort((a, b) => b.f / b.q - a.f / a.q || b.q - a.q || a.t / a.q - b.t / b.q);   // 정답률 → 푼 문항 수 → 문항당 시간
     out.lists[k] = { n: ok.length, total: all.length, top: ok.slice(0, 3).map(x => ({ name: x.name, acc: Math.round(x.f / x.q * 1000) / 10, q: x.q, c: x.c })) };
   });
-  cache.put("rank", JSON.stringify(out), 300);   // 5분 캐시
+  cache.put("rank", JSON.stringify(out), 60);    // 1분 캐시
   return out;
 }
 

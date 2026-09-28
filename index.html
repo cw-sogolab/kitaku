@@ -1349,7 +1349,7 @@ function getJSON(url, ok, fail){
 function rankUrl(){ return CONFIG.statsUrl || store.get("an.url", ""); }
 function rankLoad(force){
   const url=rankUrl(); if(!url){ RK.err="none"; render(); return; }
-  if(!force){ try{ const c=JSON.parse(sessionStorage.getItem("kitaku.rank")||"null"); if(c && Date.now()-c.t<180000){ RK.data=c.d; RK.at=c.t; render(); return; } }catch(e){} }
+  if(!force){ try{ const c=JSON.parse(sessionStorage.getItem("kitaku.rank")||"null"); if(c && Date.now()-c.t<60000){ RK.data=c.d; RK.at=c.t; render(); return; } }catch(e){} }
   RK.loading=true; RK.err=null; render();
   getJSON(url+(url.includes("?")?"&":"?")+"mode=rank", d=>{ RK.loading=false; if(d && d.ok){ RK.data=d; RK.at=Date.now(); try{ sessionStorage.setItem("kitaku.rank", JSON.stringify({t:RK.at, d})); }catch(e){} } else RK.err="net"; render(); },
     ()=>{ RK.loading=false; RK.err="net"; render(); });
@@ -1376,7 +1376,7 @@ function renderRank(){
     const cond = prac? `연습 ${min.prac||30}문항 이상` : `퇴실 퀴즈 ${RK.per==="week"? (min.clsWeek||1) : (min.clsMonth||3)}회 이상`;
     const since = RK.per==="week"? RK.data.weekStart : RK.data.monthStart;
     body=`<div class="podiums">${cards}</div>
-      <p class="hint" style="text-align:center">${since? `${esc(since.slice(5).replace("-","/"))}부터 · ` : ""}${cond} 푼 사람 ${L.n}명 중 · 첫 시도 정답률이 같으면 더 많이 푼 사람이 위<br>${fmtTime(new Date(RK.at)).slice(0,5)} 기준 (몇 분마다 갱신)</p>`;
+      <p class="hint" style="text-align:center">${since? `${esc(since.slice(5).replace("-","/"))}부터 · ` : ""}${cond} 푼 사람 ${L.n}명 중 · 첫 시도 정답률이 같으면 더 많이 푼 사람이 위<br>${fmtTime(new Date(RK.at)).slice(0,5)} 기준 · 1분마다 새로고침</p>`;
   }
   return `<div class="wrap">${back}${head}${perSeg}${clsSeg}${body}</div>`;
 }
@@ -1386,7 +1386,10 @@ function bindRank(){
   document.querySelectorAll("[data-rcls]").forEach(b=>b.onclick=()=>{ RK.cls=b.dataset.rcls; render(); });
   const rt=$("#rk-retry"); if(rt) rt.onclick=()=>rankLoad(true);
   if(!RK.data && !RK.loading && !RK.err) rankLoad(false);
+  else if(RK.data && Date.now()-RK.at>60000 && !RK.loading) rankLoad(true);
+  clearInterval(rankTimer); rankTimer=setInterval(()=>{ if(view!=="rank"){ clearInterval(rankTimer); return; } if(!RK.loading && Date.now()-RK.at>=60000) rankLoad(true); }, 15000);
 }
+let rankTimer=null;
 
 /* ───────── 강사 화면 ───────── */
 let tstate = {cls:preset.c, set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem("kitaku.ttab")||"set"; }catch(e){ return "set"; } })()};
