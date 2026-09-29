@@ -104,6 +104,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .names button[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 .seg{display:flex;gap:6px;background:var(--paper-2);border:0;border-radius:14px;padding:4px}
 .seg button{flex:1;border:0;background:none;border-radius:11px;padding:10px 4px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg button .ck{display:block;font-size:10px;font-weight:600;letter-spacing:.04em;opacity:.7;margin-bottom:1px}
 .seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 4px 10px rgba(120,90,200,.15)}
 
 .pick{width:100%;font:inherit;font-size:16px;font-weight:600;color:var(--ink);background:var(--paper-2);border:1.5px solid transparent;border-radius:14px;padding:12px 14px}
@@ -413,7 +414,8 @@ const CONFIG = {
   statsUrl: "https://script.google.com/macros/s/AKfycbytdU_JiEpriYaMUKX3H9mpm0TjdFJ29Nu-zDm1QGyUQ7SWRdYahyf2_FujMYDMzZ08/exec",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
   secret: "kitaku-2026",
   teacherPinHash: 189797738,       // 강사 화면 PIN의 hashStr 값 (초기 PIN 7350). 바꾸려면 콘솔에서 hashStr("새PIN") 실행 후 여기 붙여넣기
-  classes: { "토일반": [], "화목반": [] },   // 반 이름 (학생 이름은 본인이 입력)
+  classes: { "토일반": [], "화목반": [], "개념반": [] },   // 반 이름 (학생 이름은 본인이 입력) — 시트·랭킹에 이 이름 그대로 찍힘
+  classKind: { "토일반":"실전반", "화목반":"실전반", "개념반":"개념반" },   // 반 버튼 위 작은 글씨
   form: {                          // 구글 폼 「帰宅クイズ 기록」 (비우면 이 기기에만 저장)
     url: "https://docs.google.com/forms/d/e/1FAIpQLSemiDuYKbrHDiZTOfmAiOC2cex5Eo5zgWYsxRKfBBTARWng9Q/formResponse",
     fields: { name:"entry.1954971135", cls:"entry.1556659008", set:"entry.1257529705", first:"entry.2027853110", time:"entry.761713755", wrong:"entry.428638031", rounds:"entry.1047549204" }
@@ -1038,7 +1040,7 @@ function renderEntry(){
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><span class="lbl">반</span>
-        <div class="seg" role="group" aria-label="반 선택">${Object.keys(CONFIG.classes).map(c=>`<button data-cls="${esc(c)}" aria-pressed="${c===entry.cls}">${esc(c)}</button>`).join("")}</div>
+        <div class="seg" role="group" aria-label="반 선택">${Object.keys(CONFIG.classes).map(c=>`<button data-cls="${esc(c)}" aria-pressed="${c===entry.cls}">${clsBtn(c)}</button>`).join("")}</div>
       </div>
       <div class="field"><label for="name">이름</label>
         <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="이름을 입력하세요" value="${esc(entry.name||"")}">
@@ -1100,6 +1102,7 @@ function bindPractice(){
   $("#to-rank").onclick=()=>openRank("prac", "practice");
 }
 
+function clsBtn(c){ const k=(CONFIG.classKind||{})[c]; return k&&k!==c? `<span class="ck">${esc(k)}</span>${esc(c)}` : esc(c); }
 function startQuiz(practice){
   if(!entry.name) return;
   store.set("lastName", entry.name); if(!practice) store.set("lastCls", entry.cls);
@@ -1470,7 +1473,7 @@ function renderTeacher(){
     <div style="display:flex;flex-direction:column;gap:4px"><span class="eyebrow">강사 화면 · ${korDate(new Date())}</span><h1 style="font-size:24px">오늘 세트 만들기</h1></div>
     <div class="tgrid">
       <section class="card" style="display:flex;flex-direction:column;gap:14px">
-        <div class="field"><span class="lbl">반</span><div class="seg" role="group" aria-label="반">${Object.keys(CONFIG.classes).map(c=>`<button data-tcls="${esc(c)}" aria-pressed="${c===tstate.cls}">${esc(c)}</button>`).join("")}</div></div>
+        <div class="field"><span class="lbl">반</span><div class="seg" role="group" aria-label="반">${Object.keys(CONFIG.classes).map(c=>`<button data-tcls="${esc(c)}" aria-pressed="${c===tstate.cls}">${clsBtn(c)}</button>`).join("")}</div></div>
         <div class="field"><span class="lbl">문항 수</span><div class="seg" role="group" aria-label="문항 수">${[10,15,20,30].map(n=>`<button data-tn="${n}" aria-pressed="${n===tstate.n}">${n}문항</button>`).join("")}</div></div>
         <div class="field"><span class="lbl">범위</span><div class="setlist">${setlist}</div></div>
       </section>
