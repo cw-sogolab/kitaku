@@ -42,7 +42,7 @@ function sheet_() {
 }
 
 function rank_() {
-  const cache = CacheService.getScriptCache(), hit = cache.get("rank");
+  const cache = CacheService.getScriptCache(), CK = "rank:" + RANK_TOP + ":" + JSON.stringify(RANK_MIN), hit = cache.get(CK);   // 설정이 바뀌면 캐시도 새로
   if (hit) return JSON.parse(hit);
   const ss = SpreadsheetApp.getActiveSpreadsheet(), tz = ss.getSpreadsheetTimeZone();
   const vals = sheet_().getDataRange().getValues(), head = vals.shift().map(h => String(h).trim());
@@ -82,7 +82,7 @@ function rank_() {
       out.lists[k + "|qty"] = { n: qty.length, total: all.length, top: qty.slice(0, RANK_TOP).map(row) };
     }
   });
-  cache.put("rank", JSON.stringify(out), 60);    // 1분 캐시
+  cache.put(CK, JSON.stringify(out), 60);    // 1분 캐시
   return out;
 }
 
