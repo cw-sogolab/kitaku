@@ -250,6 +250,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .setopt .nm{font-weight:600;font-size:14px}
 .setopt .ct{margin-left:auto;font-size:12px;color:var(--muted);font-family:var(--f-mono)}
 .setopt.off{opacity:.5;cursor:not-allowed}
+.setopt .tchip{font-style:normal;font-size:10px;font-weight:700;color:var(--go);background:var(--go-soft);border-radius:999px;padding:1px 6px;margin-left:4px;vertical-align:1px}
 .setopt:has(input:checked){border-color:var(--go);background:var(--go-soft)}
 .qrpane{display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center}
 #qr{background:#fff;padding:12px;border-radius:20px;line-height:0}
@@ -461,23 +462,20 @@ const FIELD2SUBJ = {"정치":"pol","경제":"eco","현대사회":"soc","역사":
 const conW = x => 1;
 
 const SETS = [
-  {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", teacherOnly:true, composite:[
+  {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", composite:[
       {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
       {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]},
       {label:"일본 연표", share:.15, sets:["jp-his"]},
       {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
       {label:"개념", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
     ], pool:()=>[...PREFS, ...JPH, ...(CONFIG.worldChrono? WORLD : []), ...LAND, ...CON, ...CTRY, ...CLIM, ...WLAND, ...WSTAT]},
-  // 퇴실 퀴즈용 통합 범위 (강사 화면에서만 보임 — 학생 혼자 연습 목록에는 안 나옴)
-  {id:"mix-jp",  group:"통합본", subj:"geo", name:"일본 (지리+연표)", teacherOnly:true, composite:[
+  // 일본·세계 전체 통합 — 퇴실 퀴즈용, 강사 화면에서만 보임
+  {id:"mix-jp", group:"통합본", subj:"geo", name:"일본 전체 통합", teacherOnly:true, composite:[
       {label:"일본 지리", share:.6, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
       {label:"일본 연표", share:.4, sets:["jp-his"]} ], pool:()=>[...PREFS, ...LAND, ...JPH]},
-  {id:"mix-geo", group:"통합본", subj:"geo", name:"세계 지리", teacherOnly:true, composite:[
-      {label:"세계 지리", share:1, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]} ], pool:()=>[...CTRY, ...WLAND, ...CLIM, ...WSTAT]},
-  {id:"mix-wh",  group:"통합본", subj:"his", name:"세계 연표", teacherOnly:true, composite:[
-      {label:"세계 연표", share:1, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]} ], pool:()=>WORLD},
-  {id:"mix-con", group:"통합본", subj:"con", name:"개념", teacherOnly:true, composite:[
-      {label:"개념", share:1, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]} ], pool:()=>CON},
+  {id:"mix-w",  group:"통합본", subj:"geo", name:"세계 전체 통합", teacherOnly:true, composite:[
+      {label:"세계 지리", share:.5, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]},
+      {label:"세계 연표", share:.5, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]} ], pool:()=>[...CTRY, ...WLAND, ...CLIM, ...WSTAT, ...(CONFIG.worldChrono? WORLD : [])]},
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
   {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"토도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
   {id:"jp-feature", group:"일본 지리", subj:"geo", name:"토도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
@@ -504,11 +502,21 @@ const SETS = [
   {id:"c-all", group:"개념", subj:"con", name:"전 과목",  pool:()=>CON, w:conW, kinds:["concept"]},
 ];
 if(!CONFIG.worldChrono){   // 세계 연표: 준비 중 — 범위 선택에서 막고 통합본에서도 뺌(나머지 비율로 다시 나눔)
-  SETS.forEach(s=>{ if(s.group==="세계 연표" || s.id==="mix-wh") s.soon="준비 중"; });
-  const all=SETS[0]; all.composite=all.composite.filter(p=>p.label!=="세계 연표");
-  const t=all.composite.reduce((a,p)=>a+p.share,0); all.composite.forEach(p=>p.share=p.share/t);
+  SETS.forEach(s=>{ if(s.group==="세계 연표") s.soon="준비 중"; });
+  SETS.filter(x=>x.composite).forEach(c=>{ c.composite=c.composite.filter(p=>p.label!=="세계 연표");
+    const t=c.composite.reduce((a,p)=>a+p.share,0); c.composite.forEach(p=>p.share=p.share/t); });
 }
 const setById = id => SETS.find(s=>s.id===id) || SETS[0];
+// 범위 목록 묶음 (화면 표시용). group 은 영역(분석·출제 비율용) 그대로 둠
+const MENU = [
+  {menu:"통합본", ids:["all"]},
+  {menu:"일본", ids:["mix-jp","jp-region","jp-pref","jp-feature","jp-capital","jp-land","jp-his"]},
+  {menu:"세계", ids:["mix-w","g-country","g-capital","g-feature","g-land","g-climate","g-stat","w-pol","w-eco","w-soc","w-his","w-geo","w-top"]},
+  {menu:"개념", ids:["c-pol","c-eco","c-soc","c-his","c-geo","c-all"]},
+];
+const MNAME = {"jp-his":"일본 연표", "w-pol":"세계 연표 · 정치", "w-eco":"세계 연표 · 경제", "w-soc":"세계 연표 · 현대사회", "w-his":"세계 연표 · 역사", "w-geo":"세계 연표 · 지리", "w-top":"세계 연표 · S·A 등급"};
+const mname = s => MNAME[s.id] || s.name;
+const menuList = pred => MENU.map(m=>({menu:m.menu, sets:m.ids.map(id=>SETS.find(x=>x.id===id)).filter(x=>x && pred(x))})).filter(m=>m.sets.length);
 // 이름: 완성된 한글(또는 영문) 2~20자만 — 「.」 「기ㅁ현수」처럼 잘못 친 이름은 시작 버튼이 안 눌림
 const okName = v => /^[가-힣A-Za-z][가-힣A-Za-z ]{1,19}$/.test(v||"");
 const okSet = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon ? id : "all"; };
@@ -1065,7 +1073,7 @@ function renderPractice(){
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><label for="psel">범위</label>
-        <select id="psel" class="pick">${[...new Set(PRAC_SETS().map(x=>x.group))].map(g=>`<optgroup label="${esc(g)}">${PRAC_SETS().filter(x=>x.group===g).map(x=>`<option value="${x.id}" ${x.id===set.id?"selected":""}>${esc(x.name)}</option>`).join("")}</optgroup>`).join("")}</select>
+        <select id="psel" class="pick">${menuList(x=>!x.soon && !x.teacherOnly).map(({menu:g, sets:gs})=>`<optgroup label="${esc(g)}">${gs.map(x=>`<option value="${x.id}" ${x.id===set.id?"selected":""}>${esc(mname(x))}</option>`).join("")}</optgroup>`).join("")}</select>
       </div>
       <div class="field"><span class="lbl">문항 수</span>
         <div class="seg" role="group" aria-label="문항 수">${[10,20,30].map(n=>`<button data-pn="${n}" aria-pressed="${n===prac.n}">${n}</button>`).join("")}</div>
@@ -1441,11 +1449,11 @@ function studentURL(){
 function teacherTabs(){ return `<div class="seg ttabs" role="tablist" aria-label="강사 화면">${[["set","오늘 세트"],["an","학생 분석"]].map(([k,t])=>`<button data-ttab="${k}" role="tab" aria-pressed="${(tstate.tab||"set")===k}">${t}</button>`).join("")}</div>`; }
 function renderTeacher(){
   if(tstate.tab==="an") return `<div class="wrap wide">${teacherTabs()}${renderAnalysis()}</div>`;
-  const groups=[...new Set(SETS.map(s=>s.group))];
-  const setlist = groups.map(g=>{ const ss=SETS.filter(s=>s.group===g); const c=SUBJ[ss[0].subj][1];
-    return `<div class="setgroup"><h3 style="--c:${g==="세계 연표"?"var(--c-his)":c}">${esc(g)}</h3>${ss.map(s=>{
+  const MC = {"통합본":SUBJ.all[1], "일본":"var(--c-geo)", "세계":"var(--c-his)", "개념":SUBJ.con[1]};
+  const setlist = menuList(x=>!x.soon || x.id==="w-pol").map(({menu:g, sets:ss})=>
+    `<div class="setgroup"><h3 style="--c:${MC[g]||"var(--go)"}">${esc(g)}</h3>${ss.map(s=>{
       const cnt = s.soon? s.soon : s.pool().length+"개";
-      return `<label class="setopt${s.soon?" off":""}"><input type="radio" name="set" value="${s.id}" ${s.id===tstate.set?"checked":""} ${s.soon?"disabled":""}><span class="nm">${esc(s.name)}</span><span class="ct">${esc(cnt)}</span></label>`; }).join("")}</div>`; }).join("");
+      return `<label class="setopt${s.soon?" off":""}${s.teacherOnly?" tonly":""}"><input type="radio" name="set" value="${s.id}" ${s.id===tstate.set?"checked":""} ${s.soon?"disabled":""}><span class="nm">${esc(s.soon && s.group==="세계 연표" ? "세계 연표" : mname(s))}${s.teacherOnly?` <em class="tchip">강사용</em>`:""}</span><span class="ct">${esc(cnt)}</span></label>`; }).join("")}</div>`).join("");
   const log=store.get("log", []).filter(r=>r.date===today()).reverse();
   const tally={}; log.forEach(r=>r.wrong.forEach(w=>{ tally[w.id]=tally[w.id]||{name:w.name,c:0}; tally[w.id].c++; }));
   const worst=Object.values(tally).sort((a,b)=>b.c-a.c).slice(0,5);
@@ -1506,7 +1514,7 @@ function anIndex(){
 }
 const AN_LABEL = (()=>{ const m={}; SETS.forEach(s=>{ m[setLabel(s)]=s; }); return m; })();
 function anSet(label){
-  let l=String(label||"").replace(/^연습 · /,"").trim().replace(/^개념\(기출\)/,"개념").replace("도도부현 위치","토도부현").replace("도도부현","토도부현").replace("자연지리(지형)","세계 지형").replace("기후 그래프(쾨펜)","기후 그래프");
+  let l=String(label||"").replace(/^연습 · /,"").trim().replace(/^개념\(기출\)/,"개념").replace("도도부현 위치","토도부현").replace("도도부현","토도부현").replace("통합본 · 일본 (지리+연표)","통합본 · 일본 전체 통합").replace("통합본 · 세계 지리","통합본 · 세계 전체 통합").replace("통합본 · 개념","개념 · 전 과목").replace("자연지리(지형)","세계 지형").replace("기후 그래프(쾨펜)","기후 그래프");
   if(AN_LABEL[l]) return AN_LABEL[l];
   if(/일본 지리 · 지형/.test(l)) return setById("jp-land");
   return null;
