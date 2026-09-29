@@ -1402,7 +1402,7 @@ function renderRank(){
       const sinceTxt = since? `${+since.slice(5,7)}/${+since.slice(8,10)}~` : "";
       const cond = board==="qty"? "" : prac? `${min.prac||30}문제 이상` : `${RK.per==="week"? (min.clsWeek||1) : (min.clsMonth||3)}회 이상`;
       body=`<div class="podiums">${cards}</div><div class="rk-rest">${rest}</div>
-        <div class="rk-meta">${sinceTxt?`<span>📅 ${sinceTxt}</span>`:""}<span>👥 ${L.n}명${cond?` <em>(${cond})</em>`:""}</span><span>🕙 ${fmtTime(new Date(RK.at)).slice(0,5)} 업데이트</span></div>`;
+        <div class="rk-meta">${sinceTxt?`<span>📅 ${sinceTxt}</span>`:""}${cond?`<span>✔ ${cond} 푼 사람</span>`:""}<span>🕙 ${fmtTime(new Date(RK.at)).slice(0,5)} 업데이트</span></div>`;
     }
   }
   return `<div class="wrap">${back}${head}${boardSeg}${perSeg}${clsSeg}${body}</div>`;
