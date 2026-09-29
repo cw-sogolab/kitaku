@@ -1400,7 +1400,7 @@ function renderRank(){
         return `<div class="rk-row${x?"":" empty"}"><span class="no">${i+1}</span><span class="nm">${x? esc(x.name) : "—"}</span><span class="sub">${x? sub(x) : ""}</span><span class="v">${x? big(x) : ""}</span></div>`; }).join("");
       const since = RK.per==="week"? RK.data.weekStart : RK.data.monthStart;
       const sinceTxt = since? `${+since.slice(5,7)}/${+since.slice(8,10)}~` : "";
-      const cond = board==="qty"? "" : prac? `${min.prac||30}문제 이상` : `${RK.per==="week"? (min.clsWeek||1) : (min.clsMonth||3)}회 이상`;
+      const cond = board==="qty"? "" : prac? `${min.prac||50}문제 이상` : `${RK.per==="week"? (min.clsWeek||1) : (min.clsMonth||3)}회 이상`;
       body=`<div class="podiums">${cards}</div><div class="rk-rest">${rest}</div>
         <div class="rk-meta">${sinceTxt?`<span>📅 ${sinceTxt}</span>`:""}${cond?`<span>✔ ${cond} 푼 사람</span>`:""}<span>🕙 ${fmtTime(new Date(RK.at)).slice(0,5)} 업데이트</span></div>`;
     }

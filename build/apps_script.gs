@@ -15,7 +15,7 @@ const KEY = "여기에-비밀-키";   // 실제 키는 저장소에 올리지 �
 
 const RANK_EXCLUDE = ["현채원"];          // 랭킹에서 뺄 이름 (선생님 테스트 기록 등)
 const RANK_TOP = 5;                       // 몇 위까지 보여줄지
-const RANK_MIN = { prac: 30, clsWeek: 1, clsMonth: 3 };   // 랭킹 조건: 연습 30문항 이상 / 퇴실 퀴즈 이번 주 1회·이번 달 3회 이상
+const RANK_MIN = { prac: 50, clsWeek: 1, clsMonth: 3 };   // 랭킹 조건: 연습 50문항 이상 / 퇴실 퀴즈 이번 주 1회·이번 달 3회 이상
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
