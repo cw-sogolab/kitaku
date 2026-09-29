@@ -461,13 +461,23 @@ const FIELD2SUBJ = {"정치":"pol","경제":"eco","현대사회":"soc","역사":
 const conW = x => 1;
 
 const SETS = [
-  {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", composite:[
+  {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", teacherOnly:true, composite:[
       {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
       {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]},
       {label:"일본 연표", share:.15, sets:["jp-his"]},
       {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
       {label:"개념", share:.30, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]}
     ], pool:()=>[...PREFS, ...JPH, ...(CONFIG.worldChrono? WORLD : []), ...LAND, ...CON, ...CTRY, ...CLIM, ...WLAND, ...WSTAT]},
+  // 퇴실 퀴즈용 통합 범위 (강사 화면에서만 보임 — 학생 혼자 연습 목록에는 안 나옴)
+  {id:"mix-jp",  group:"통합본", subj:"geo", name:"일본 (지리+연표)", teacherOnly:true, composite:[
+      {label:"일본 지리", share:.6, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
+      {label:"일본 연표", share:.4, sets:["jp-his"]} ], pool:()=>[...PREFS, ...LAND, ...JPH]},
+  {id:"mix-geo", group:"통합본", subj:"geo", name:"세계 지리", teacherOnly:true, composite:[
+      {label:"세계 지리", share:1, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]} ], pool:()=>[...CTRY, ...WLAND, ...CLIM, ...WSTAT]},
+  {id:"mix-wh",  group:"통합본", subj:"his", name:"세계 연표", teacherOnly:true, composite:[
+      {label:"세계 연표", share:1, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]} ], pool:()=>WORLD},
+  {id:"mix-con", group:"통합본", subj:"con", name:"개념", teacherOnly:true, composite:[
+      {label:"개념", share:1, sets:["c-pol","c-eco","c-soc","c-his","c-geo"]} ], pool:()=>CON},
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
   {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"토도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
   {id:"jp-feature", group:"일본 지리", subj:"geo", name:"토도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
@@ -494,7 +504,7 @@ const SETS = [
   {id:"c-all", group:"개념", subj:"con", name:"전 과목",  pool:()=>CON, w:conW, kinds:["concept"]},
 ];
 if(!CONFIG.worldChrono){   // 세계 연표: 준비 중 — 범위 선택에서 막고 통합본에서도 뺌(나머지 비율로 다시 나눔)
-  SETS.forEach(s=>{ if(s.group==="세계 연표") s.soon="준비 중"; });
+  SETS.forEach(s=>{ if(s.group==="세계 연표" || s.id==="mix-wh") s.soon="준비 중"; });
   const all=SETS[0]; all.composite=all.composite.filter(p=>p.label!=="세계 연표");
   const t=all.composite.reduce((a,p)=>a+p.share,0); all.composite.forEach(p=>p.share=p.share/t);
 }
@@ -502,7 +512,9 @@ const setById = id => SETS.find(s=>s.id===id) || SETS[0];
 // 이름: 완성된 한글(또는 영문) 2~20자만 — 「.」 「기ㅁ현수」처럼 잘못 친 이름은 시작 버튼이 안 눌림
 const okName = v => /^[가-힣A-Za-z][가-힣A-Za-z ]{1,19}$/.test(v||"");
 const okSet = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon ? id : "all"; };
-const setLabel = s => s.composite ? "통합본" : s.group+" · "+s.name;
+const PRAC_SETS = () => SETS.filter(x=>!x.soon && !x.teacherOnly);   // 학생 혼자 연습 목록
+const okPrac = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon && !s.teacherOnly ? id : PRAC_SETS()[0].id; };
+const setLabel = s => s.composite ? (s.id==="all" ? "통합본" : "통합본 · "+s.name) : s.group+" · "+s.name;
 
 /* ───────── 지도 ───────── */
 const M = D.jpmap;
@@ -937,12 +949,12 @@ function planComposite(set, n, seed){
   const raw = set.composite.map(p=>p.share*n), q = raw.map(Math.floor);
   let left = n - q.reduce((a,b)=>a+b,0);
   raw.map((v,i)=>[v-Math.floor(v),i]).sort((a,b)=>b[0]-a[0]).forEach(([_,i])=>{ if(left>0){ q[i]++; left--; } });
-  const used = new Set(), out = [];
+  const used = new Set(), out = [], hasJH = set.composite.some(p=>p.sets.includes("jp-his"));
   set.composite.forEach((part,pi)=>{
     const subs = part.sets.map(setById);
     for(let k=0;k<q[pi];k++){
       const sub = weightedSample(subs, s=>s.pool().length, 1, r)[0];
-      const cand = sub.pool().filter(it=>!used.has(itemId(sub.id,it)) && !(sub.id.startsWith("w-") && it.jp));   // 통합본: 일본연표에 있는 사건은 세계연표 쪽에서 빼서 중복 방지
+      const cand = sub.pool().filter(it=>!used.has(itemId(sub.id,it)) && !(sub.id.startsWith("w-") && it.jp && hasJH));   // 통합본: 일본연표에 있는 사건은 세계연표 쪽에서 빼서 중복 방지
       const pl = planSet({...sub, pool:()=>cand}, 1, Math.floor(r()*1e9))[0];
       if(!pl) continue;
       used.add(itemId(sub.id, pl.it)); out.push({...pl, sid:sub.id});
@@ -962,8 +974,8 @@ let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:"화목반", 
 if(params.get("set")){ preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||preset.c, date:today()}; store.set("preset2", preset); }
 // QR(주소에 set=)로 들어왔거나 오늘 받은 세트가 있으면 수업 모드, 아니면 혼자 연습 모드
 let mode = (params.get("set") || preset.date===today()) ? "class" : "practice";
-let prac = store.get("prac", {set:"all", n:10});
-preset.set = okSet(preset.set); prac.set = okSet(prac.set);
+let prac = store.get("prac", {set:"jp-region", n:10});
+preset.set = okSet(preset.set); prac.set = okPrac(prac.set);
 const home = () => mode==="class" ? "entry" : "practice";
 let S = null;         // 퀴즈 진행 상태
 const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
@@ -1053,7 +1065,7 @@ function renderPractice(){
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><label for="psel">범위</label>
-        <select id="psel" class="pick">${[...new Set(SETS.filter(x=>!x.soon).map(x=>x.group))].map(g=>`<optgroup label="${esc(g)}">${SETS.filter(x=>x.group===g&&!x.soon).map(x=>`<option value="${x.id}" ${x.id===set.id?"selected":""}>${esc(x.name)}</option>`).join("")}</optgroup>`).join("")}</select>
+        <select id="psel" class="pick">${[...new Set(PRAC_SETS().map(x=>x.group))].map(g=>`<optgroup label="${esc(g)}">${PRAC_SETS().filter(x=>x.group===g).map(x=>`<option value="${x.id}" ${x.id===set.id?"selected":""}>${esc(x.name)}</option>`).join("")}</optgroup>`).join("")}</select>
       </div>
       <div class="field"><span class="lbl">문항 수</span>
         <div class="seg" role="group" aria-label="문항 수">${[10,20,30].map(n=>`<button data-pn="${n}" aria-pressed="${n===prac.n}">${n}</button>`).join("")}</div>
