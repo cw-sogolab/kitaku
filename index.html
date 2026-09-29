@@ -1033,7 +1033,7 @@ function renderEntry(){
       <div class="stk s1">♡</div><div class="stk s2">☆</div>
       <span class="eyebrow">오늘의 퇴실 퀴즈 · ${korDateShort()}</span>
       <h1>${esc(set.name)}</h1>
-      <div class="meta"><span><b>${preset.n}</b>문항</span><span>다 맞히면 퇴실</span><span>틀린 문제는 다시 나와요</span></div>
+      <div class="meta"><span><b>${preset.n}</b>문항</span><span>한 번에 다 맞혀야 퇴실</span><span>틀리면 처음부터</span></div>
       <div class="chips">${set.composite? set.composite.map(c=>`<span>${esc(c.label)}</span>`).join("") : `<span>${esc(set.group)}</span>`}</div>
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
@@ -1124,7 +1124,7 @@ function railHTML(){
   const stations = S.plans.map((_,i)=>`<span class="st${S.cleared.has(i)?" done":""}${i===cur&&!S.answered?" now":""}"></span>`).join("");
   const left=S.n-S.cleared.size;
   return `<div class="rail">
-    <div class="rail-top"><span class="home-count">집까지<b>${left}</b>문제</span><span class="lap">${S.round>1? S.round+"번째 바퀴 · 틀린 것만" : (S.pos+1)+" / "+S.queue.length}</span></div>
+    <div class="rail-top"><span class="home-count">집까지<b>${left}</b>문제</span><span class="lap">${!S.practice? (S.round>1? S.round+"번째 도전 · ":"")+(S.pos+1)+" / "+S.queue.length : S.round>1? S.round+"번째 바퀴 · 틀린 것만" : (S.pos+1)+" / "+S.queue.length}</span></div>
     <div class="track"><span class="end">教室</span><div class="stations${S.n>20?" dense":""}"><span class="fill" style="width:${S.cleared.size/S.n*100}%"></span>${stations}</div><span class="end">自宅</span></div>
   </div>`;
 }
@@ -1146,7 +1146,7 @@ function renderQuiz(){
   let fb="";
   if(S.answered){
     const ok=S.lastOk;
-    fb = `<div class="fb ${ok?"ok":"ng"}"><span class="head">${ok?"정답!":"아쉬워요 — 뒤에서 다시 나와요"}</span><div>${q.explain}</div>${S.locked?`<span class="lock" id="lock">두 번 연속 틀렸어요. 해설을 읽고 <b id="lockn">5</b>초 뒤에 넘어갈 수 있어요.</span>`:""}</div>
+    fb = `<div class="fb ${ok?"ok":"ng"}"><span class="head">${ok?"정답!": S.practice?"아쉬워요 — 뒤에서 다시 나와요":"아쉬워요 — 끝까지 풀고 처음부터 다시!"}</span><div>${q.explain}</div>${S.locked?`<span class="lock" id="lock">두 번 연속 틀렸어요. 해설을 읽고 <b id="lockn">5</b>초 뒤에 넘어갈 수 있어요.</span>`:""}</div>
       <button class="btn" id="next" ${S.locked?"disabled":""}>${ok?"다음":"확인했어요"}</button>`;
   }
   return `<div class="wrap">
@@ -1183,15 +1183,22 @@ function advance(){
   if(!S.answered || S.locked) return;
   S.pos++;
   if(S.pos>=S.queue.length){
-    if(S.next.length){ S.round++; S.queue=S.next; S.next=[]; S.pos=0; go("lap"); return; }
+    if(S.next.length){
+      S.round++; S.lastMiss=S.next.length; S.pos=0;
+      if(S.practice) S.queue=S.next;                                   // 연습: 틀린 것만 다시
+      else { S.queue=S.plans.map((_,i)=>i); S.cleared=new Set(); }      // 퇴실 퀴즈: 한 번에 전부 맞혀야 통과 → 처음부터
+      S.next=[]; go("lap"); return;
+    }
     finish(); return;
   }
   loadQ(); render(); window.scrollTo({top:0});
 }
 function renderLap(){
   return `<div class="wrap">${railHTML()}
-    <section class="card lapcard"><span class="eyebrow">${S.round}번째 바퀴</span><span class="n">${S.queue.length}</span><h2>틀린 문제만 다시!</h2><p class="muted" style="margin:0">보기 순서와 오답이 바뀌어서 나와요.</p></section>
-    <button class="btn" id="go">다시 풀기</button></div>`;
+    ${S.practice
+      ? `<section class="card lapcard"><span class="eyebrow">${S.round}번째 바퀴</span><span class="n">${S.queue.length}</span><h2>틀린 문제만 다시!</h2><p class="muted" style="margin:0">보기 순서와 오답이 바뀌어서 나와요.</p></section>`
+      : `<section class="card lapcard"><span class="eyebrow">${S.round}번째 도전</span><span class="n">↺</span><h2>처음부터 다시!</h2><p style="margin:0;font-weight:600">지난 도전에서 <b style="color:var(--stop)">${S.lastMiss}문제</b> 틀렸어요</p><p class="muted" style="margin:0">${S.n}문제를 한 번에 전부 맞혀야 집에 갈 수 있어요.<br>보기 순서와 오답이 바뀌어서 나와요.</p></section>`}
+    <button class="btn" id="go">${S.practice?"다시 풀기":"처음부터 다시 도전"}</button></div>`;
 }
 function bindLap(){ $("#go").onclick=()=>{ loadQ(); go("quiz"); }; }
 
@@ -1248,7 +1255,7 @@ function renderTicket(){
       <div class="t-grid">
         <div class="f"><span>반</span><b>${esc(S.cls)}</b></div>
         <div class="f"><span>이름</span><b>${esc(S.name)}</b></div>
-        <div class="f mono"><span>시도 횟수</span><b>${S.round}회</b></div>
+        <div class="f mono"><span>도전 횟수</span><b>${S.round}회</b></div>
         <div class="f mono"><span>첫 시도 정답</span><b>${S.firstOk.size} / ${S.n}</b></div>
         <div class="f mono"><span>푼 문제 수</span><b>${Object.values(S.tries).reduce((a,b)=>a+b,0)}문제</b></div>
         <div class="f mono"><span>걸린 시간</span><b>${fmtDur(S.endAt-S.startAt)}</b></div>
@@ -1260,7 +1267,7 @@ function renderTicket(){
       </div>
     </section>
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-      <span class="growth">${growth}</span><span class="muted" style="font-size:12px">${S.round>1? S.round+"번째 시도에 통과":"한 번에 통과!"}</span>
+      <span class="growth">${growth}</span><span class="muted" style="font-size:12px">${S.round>1? S.round+"번째 도전에 전부 통과":"첫 도전에 전부 통과!"}</span>
     </div>
     <p class="sent">${S.sent?"결과가 선생님 시트로 전송됐어요.":"결과는 이 기기에 저장됐어요."}<br>문 앞에서 이 화면을 선생님께 보여주세요.</p>
     <button class="btn ghost" id="again">처음 화면으로</button>
