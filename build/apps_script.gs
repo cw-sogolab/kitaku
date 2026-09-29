@@ -8,11 +8,13 @@
  * KEY 를 아는 사람만 기록을 볼 수 있습니다. KEY 를 바꾸면 「배포 관리 → 편집 → 새 버전」으로 다시 배포하세요.
  * 코드를 고친 뒤에는 항상 「배포 → 배포 관리 → ✏️ 편집 → 버전: 새 버전 → 배포」 (URL은 그대로 유지됨)
  *
- * ?mode=rank (키 없이 공개): 학생 화면 랭킹용 — 이번 주·이번 달 첫 시도 정답률 상위 3명의 이름·정답률만 돌려줌 (1분마다 새로 계산)
+ * ?mode=rank (키 없이 공개): 학생 화면 랭킹용 — 이번 주·이번 달 상위 5명의 이름·정답률·문항 수만 돌려줌 (1분마다 새로 계산)
+ *   연습: 🎯 스나이퍼(첫 시도 정답률) · 🔥 갓생러(푼 문항 수) / 퇴실 퀴즈: 정답률만
  */
 const KEY = "여기에-비밀-키";   // 실제 키는 저장소에 올리지 말 것
 
 const RANK_EXCLUDE = ["현채원"];          // 랭킹에서 뺄 이름 (선생님 테스트 기록 등)
+const RANK_TOP = 5;                       // 몇 위까지 보여줄지
 const RANK_MIN = { prac: 30, clsWeek: 1, clsMonth: 3 };   // 랭킹 조건: 연습 30문항 이상 / 퇴실 퀴즈 이번 주 1회·이번 달 3회 이상
 
 function doGet(e) {
@@ -73,7 +75,12 @@ function rank_() {
     const need = prac ? RANK_MIN.prac : (/\|week$/.test(k) ? RANK_MIN.clsWeek : RANK_MIN.clsMonth);
     const ok = all.filter(x => (prac ? x.q : x.c) >= need);
     ok.sort((a, b) => b.f / b.q - a.f / a.q || b.q - a.q || a.t / a.q - b.t / b.q);   // 정답률 → 푼 문항 수 → 문항당 시간
-    out.lists[k] = { n: ok.length, total: all.length, top: ok.slice(0, 3).map(x => ({ name: x.name, acc: Math.round(x.f / x.q * 1000) / 10, q: x.q, c: x.c })) };
+    const row = x => ({ name: x.name, acc: Math.round(x.f / x.q * 1000) / 10, q: x.q, c: x.c });
+    out.lists[k] = { n: ok.length, total: all.length, top: ok.slice(0, RANK_TOP).map(row) };
+    if (prac) {   // 🔥 갓생러: 푼 문항 수 순 (조건 없음), 같으면 정답률 높은 사람이 위
+      const qty = all.slice().sort((a, b) => b.q - a.q || b.f / b.q - a.f / a.q);
+      out.lists[k + "|qty"] = { n: qty.length, total: all.length, top: qty.slice(0, RANK_TOP).map(row) };
+    }
   });
   cache.put("rank", JSON.stringify(out), 60);    // 1분 캐시
   return out;

@@ -342,6 +342,23 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .podium.p1{background:linear-gradient(120deg,var(--go-soft),var(--card));border-color:var(--go-2)}
 .podium.p1 .nm{font-size:21px}
 .podium.empty{opacity:.6;box-shadow:none}
+.podium .acc small{font-size:13px;margin-left:1px;color:var(--muted)}
+.rk-boards button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 4px}
+.rk-boards button b{font-size:15px}
+.rk-boards button small{font-size:11px;font-weight:500;color:var(--muted)}
+.rk-rest{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--card-line);border-radius:18px;overflow:hidden}
+.rk-row{display:grid;grid-template-columns:44px 1fr auto auto;align-items:center;column-gap:10px;padding:11px 16px}
+.rk-row+.rk-row{border-top:1px solid var(--line)}
+.rk-row .no{font-family:var(--f-mono);font-size:15px;color:var(--muted);text-align:center}
+.rk-row .nm{font-weight:700}
+.rk-row .sub{font-size:12px;color:var(--muted)}
+.rk-row .v{font-family:var(--f-mono);font-size:16px;color:var(--go);min-width:56px;text-align:right}
+.rk-row .v small{font-size:11px;color:var(--muted);margin-left:1px}
+.rk-row.empty .nm{color:var(--muted);font-weight:400}
+.rk-meta{display:flex;justify-content:center;flex-wrap:wrap;gap:6px}
+.rk-meta span{font-size:12px;color:var(--muted);background:var(--paper-2);border-radius:999px;padding:4px 10px}
+.rk-meta em{font-style:normal;opacity:.8}
+
 /* 휴대폰(가로 430px 이하): 글자·여백 조금 줄임 */
 @media (max-width:430px){
   body{font-size:14px}
@@ -1332,7 +1349,7 @@ function openMine(from){ mineBack=from; go("mine"); window.scrollTo(0,0); }
 
 
 /* ───────── 랭킹 (시트 → Apps Script ?mode=rank, 상위 3명만 공개) ───────── */
-const RK = { data:null, at:0, loading:false, err:null, kind:"prac", per:"week", cls:null, back:null };
+const RK = { data:null, at:0, loading:false, err:null, kind:"prac", per:"week", cls:null, back:null, board:"acc" };
 function jsonp(url, ok, fail, ms=15000){
   const cb="__kq"+Date.now()+Math.floor(Math.random()*1e4), sc=document.createElement("script");
   const end=()=>{ clearTimeout(tm); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } sc.remove(); };
@@ -1356,10 +1373,11 @@ function rankLoad(force){
 }
 function openRank(kind, back){ RK.kind=kind; RK.back=back; if(!RK.cls) RK.cls = entry.cls || preset.c || "전체"; go("rank"); window.scrollTo(0,0); }
 function renderRank(){
-  const prac = RK.kind==="prac";
+  const prac = RK.kind==="prac", board = prac? RK.board : "acc";
   const back=`<button class="btn small ghost" id="rk-back" style="align-self:flex-start">← 돌아가기</button>`;
   const head=`<section class="card setcard" style="gap:6px"><div class="stk s1">🏆</div><div class="stk s2">☆</div>
-      <span class="eyebrow">첫 시도 정답률 TOP 3</span><h1>${prac? "연습 랭킹" : "퇴실 퀴즈 랭킹"}</h1></section>`;
+      <span class="eyebrow">${prac? "혼자 연습" : "퇴실 퀴즈"} · TOP 5</span><h1>${prac? "연습 랭킹" : "퇴실 퀴즈 랭킹"}</h1></section>`;
+  const boardSeg = prac? `<div class="seg rk-boards" role="tablist" aria-label="랭킹 종류">${[["acc","🎯 스나이퍼","첫 시도 정답률"],["qty","🔥 갓생러","푼 문제 수"]].map(([k,t,d])=>`<button data-rboard="${k}" aria-pressed="${k===board}"><b>${t}</b><small>${d}</small></button>`).join("")}</div>` : "";
   const perSeg=`<div class="seg" role="group" aria-label="기간">${[["week","이번 주"],["month","이번 달"]].map(([k,t])=>`<button data-rper="${k}" aria-pressed="${k===RK.per}">${t}</button>`).join("")}</div>`;
   const clsSeg= prac? "" : `<div class="seg" role="group" aria-label="반">${["전체", ...Object.keys(CONFIG.classes)].map(c=>`<button data-rcls="${esc(c)}" aria-pressed="${c===RK.cls}">${esc(c)}</button>`).join("")}</div>`;
   let body;
@@ -1367,22 +1385,32 @@ function renderRank(){
   else if(RK.err) body=`<section class="card an-msg">랭킹을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.<br><button class="linkbtn" id="rk-retry">다시 불러오기</button></section>`;
   else if(!RK.data) body=`<section class="card an-msg">불러오는 중…</section>`;
   else {
-    const key = prac? `prac|${RK.per}` : `cls|${RK.cls}|${RK.per}`;
-    const L0 = RK.data.lists[key] || {n:0, total:0, top:[]}, min=RK.data.min||{}; const L = {...L0, top:(L0.top||[]).filter(x=>okName(String(x.name).trim()))};
-    const medal=["🥇","🥈","🥉"];
-    const cards=[0,1,2].map(i=>{ const x=L.top[i];
-      return x? `<div class="podium p${i+1}"><span class="md">${medal[i]}</span><b class="nm">${esc(x.name)}</b><span class="acc">${x.acc}%</span><span class="sub">${prac? `${x.q}문항` : `${x.c}회 · ${x.q}문항`}</span></div>`
-              : `<div class="podium p${i+1} empty"><span class="md">${medal[i]}</span><span class="nm muted">도전자를 기다려요</span></div>`; }).join("");
-    const cond = prac? `연습 ${min.prac||30}문항 이상` : `퇴실 퀴즈 ${RK.per==="week"? (min.clsWeek||1) : (min.clsMonth||3)}회 이상`;
-    const since = RK.per==="week"? RK.data.weekStart : RK.data.monthStart;
-    body=`<div class="podiums">${cards}</div>
-      <p class="hint" style="text-align:center">${since? `${esc(since.slice(5).replace("-","/"))}부터 · ` : ""}${cond} 푼 사람 ${L.n}명 중 · 첫 시도 정답률이 같으면 더 많이 푼 사람이 위<br>${fmtTime(new Date(RK.at)).slice(0,5)} 기준 · 1분마다 새로고침</p>`;
+    const key = prac? `prac|${RK.per}${board==="qty"?"|qty":""}` : `cls|${RK.cls}|${RK.per}`;
+    const L0 = RK.data.lists[key], min=RK.data.min||{};
+    if(!L0 && board==="qty") body=`<section class="card an-msg">🔥 갓생러 랭킹은 곧 열려요!</section>`;
+    else {
+      const L = {...(L0||{n:0,top:[]})}; L.top=(L.top||[]).filter(x=>okName(String(x.name).trim())).slice(0,5);
+      const medal=["🥇","🥈","🥉"];
+      const big = x => board==="qty"? `${x.q}<small>문제</small>` : `${x.acc}<small>%</small>`;
+      const sub = x => board==="qty"? `정답률 ${x.acc}%` : (prac? `${x.q}문제` : `${x.c}회 · ${x.q}문제`);
+      const cards=[0,1,2].map(i=>{ const x=L.top[i];
+        return x? `<div class="podium p${i+1}"><span class="md">${medal[i]}</span><b class="nm">${esc(x.name)}</b><span class="acc">${big(x)}</span><span class="sub">${sub(x)}</span></div>`
+                : `<div class="podium p${i+1} empty"><span class="md">${medal[i]}</span><span class="nm muted">도전자를 기다려요</span></div>`; }).join("");
+      const rest=[3,4].map(i=>{ const x=L.top[i];
+        return `<div class="rk-row${x?"":" empty"}"><span class="no">${i+1}</span><span class="nm">${x? esc(x.name) : "—"}</span><span class="sub">${x? sub(x) : ""}</span><span class="v">${x? big(x) : ""}</span></div>`; }).join("");
+      const since = RK.per==="week"? RK.data.weekStart : RK.data.monthStart;
+      const sinceTxt = since? `${+since.slice(5,7)}/${+since.slice(8,10)}~` : "";
+      const cond = board==="qty"? "" : prac? `${min.prac||30}문제 이상` : `${RK.per==="week"? (min.clsWeek||1) : (min.clsMonth||3)}회 이상`;
+      body=`<div class="podiums">${cards}</div><div class="rk-rest">${rest}</div>
+        <div class="rk-meta">${sinceTxt?`<span>📅 ${sinceTxt}</span>`:""}<span>👥 ${L.n}명${cond?` <em>(${cond})</em>`:""}</span><span>🕙 ${fmtTime(new Date(RK.at)).slice(0,5)} 업데이트</span></div>`;
+    }
   }
-  return `<div class="wrap">${back}${head}${perSeg}${clsSeg}${body}</div>`;
+  return `<div class="wrap">${back}${head}${boardSeg}${perSeg}${clsSeg}${body}</div>`;
 }
 function bindRank(){
   $("#rk-back").onclick=()=>{ const b=RK.back||home(); RK.back=null; go(b); };
   document.querySelectorAll("[data-rper]").forEach(b=>b.onclick=()=>{ RK.per=b.dataset.rper; render(); });
+  document.querySelectorAll("[data-rboard]").forEach(b=>b.onclick=()=>{ RK.board=b.dataset.rboard; render(); });
   document.querySelectorAll("[data-rcls]").forEach(b=>b.onclick=()=>{ RK.cls=b.dataset.rcls; render(); });
   const rt=$("#rk-retry"); if(rt) rt.onclick=()=>rankLoad(true);
   if(!RK.data && !RK.loading && !RK.err) rankLoad(false);
