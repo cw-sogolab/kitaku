@@ -58,7 +58,12 @@ def build_climate():
     return out
 
 def build_countries():
-    return [dict(id="G"+iso, iso=iso, ko=ko, ja=ja, cap=cap, reg=reg, core=core, hint=hint) for iso, ko, ja, cap, reg, core, hint in C]
+    from ctryfeat import F     # 「나라의 특징」 추가 힌트 (자료집 07장·01장 근거, 나라마다 여러 개)
+    out = []
+    for iso, ko, ja, cap, reg, core, hint in C:
+        feats = ([hint] if hint else []) + F.get(iso, [])
+        out.append(dict(id="G"+iso, iso=iso, ko=ko, ja=ja, cap=cap, reg=reg, core=core, hint=hint, feats=feats))
+    return out
 
 def build_landxy(ox, oy, K=40, R=0.812):
     xy = lambda lat, lon: [round((lon-128.4)*K*R-ox, 1), round((45.7-lat)*K-oy, 1)]

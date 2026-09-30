@@ -455,6 +455,8 @@ const LAND = D.landforms.map((x,i)=>({...x, id:"L"+String(i+1).padStart(3,"0")})
 const CON = D.concept.map(x=>({...x, id:"K"+x.src}));
 const LANDC = LAND.filter(x=>x.core), LANDM = LANDC.filter(x=>x.xy);   // core = 자료집 03~06 요약표에 실린 지형
 const CTRY = D.countries || [], CLIM = D.climate || [];
+// 「나라의 특징」: 나라마다 힌트가 여러 개 → 힌트 하나가 문항 하나 (id: GF156-2). 한 판에 같은 나라는 한 번만 (uniq)
+const CFEAT = CTRY.flatMap(c => (c.feats || (c.hint? [c.hint] : [])).map((h,k)=>({id:"GF"+c.iso+"-"+(k+1), ko:c.ko, ja:c.ja, iso:c.iso, core:c.core, fh:h, base:c})));
 const WLAND = (D.wland || []).filter(x=>x.t!=="산"), WBELT = D.wbelts || {};
 const WSTAT = (D.wstat || []).map(x=>({...x, ko: x.kind==="most" ? x.q+" 나라" : x.item+(x.meas?" "+x.meas:"")}));
 const WM = D.wmap, WPATH = Object.fromEntries((WM?WM.paths:[]).map(p=>[p.id,p]));
@@ -482,11 +484,11 @@ const SETS = [
   {id:"jp-region",  group:"일본 지리", subj:"geo", name:"8지방 구분",     pool:()=>PREFS, w:p=>SW[p.star], kinds:["prefRegion","prefRegion","regionMap"]},
   {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"토도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
   {id:"jp-feature", group:"일본 지리", subj:"geo", name:"토도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
-  {id:"jp-capital", group:"일본 지리", subj:"geo", name:"현청소재지",     pool:()=>PREFS, w:p=>p.n===13?0:(p.diff?5:0.6), kinds:["prefCapital","capitalPref","mapCapital"]},
+  {id:"jp-capital", group:"일본 지리", subj:"geo", name:"현청소재지",     pool:()=>PREFS.filter(p=>p.diff), w:p=>1, kinds:["prefCapital","capitalPref","mapCapital"]},   // 현 이름과 현청소재지 이름이 다른 18곳만 (2026-09-30)
   {id:"jp-land",    group:"일본 지리", subj:"geo", name:"일본 지형",           pool:()=>LANDC, w:x=>1, kinds:x=>x.xy ? ["landMap","landMap","landPref","prefLand"] : ["landPref","landPref","prefLand"]},
   {id:"g-country",  group:"세계 지리", subj:"geo", name:"나라 위치", pool:()=>CTRY.filter(c=>WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryMap"]},
   {id:"g-capital",  group:"세계 지리", subj:"geo", name:"수도", pool:()=>CTRY.filter(c=>c.cap && WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryCapital","capitalCountry"]},
-  {id:"g-feature",  group:"세계 지리", subj:"geo", name:"나라의 특징", pool:()=>CTRY.filter(c=>c.hint), w:c=>c.core?2:1, kinds:["countryHint"]},
+  {id:"g-feature",  group:"세계 지리", subj:"geo", name:"나라의 특징", pool:()=>CFEAT, w:f=>(f.base.core?2:1)/Math.sqrt(f.base.feats?f.base.feats.length:1), uniq:f=>f.iso, size:()=>new Set(CFEAT.map(f=>f.iso)).size, kinds:["countryHint"]},   // 통합본 비중은 나라 수 기준
   {id:"g-land",     group:"세계 지리", subj:"geo", name:"세계 지형", pool:()=>WLAND, w:x=>x.t==="해류"||x.t==="해협·운하"?1.5:1, kinds:wlKinds},
   {id:"g-climate",  group:"세계 지리", subj:"geo", name:"기후 그래프", pool:()=>CLIM, w:x=>1, kinds:["climOndo","climHyther","climCity"]},
   {id:"g-stat",     group:"세계 지리", subj:"geo", name:"주요 통계", pool:()=>WSTAT, w:x=>x.kind==="most"?3:(x.cat==="농산물"||x.cat==="에너지 자원"?1.2:1), kinds:wsKinds},
@@ -783,11 +785,14 @@ const BUILD = {
     const k = mk(c, w, r, ctryLabel);
     return {...k, tag:"수도", prompt:`<span class="big">${esc(c.cap)}</span>어느 나라의 수도일까?`, svgAfter:worldSVG(c.iso), explain:ctryExplain(c)};
   },
-  countryHint(c, r){
+  countryHint(f, r){
+    const c = f.base || f, h = f.fh || c.hint;
     const reg = shuffle(CTRY.filter(x=>x!==c && x.reg===c.reg), r), near = nearCountries(c, 6);
     const w=[]; for(const x of [...reg, ...near]){ if(w.length>=3) break; if(!w.includes(x)) w.push(x); }
     const k = mk(c, w, r, ctryLabel);
-    return {...k, tag:"나라의 특징", prompt:`<span class="qtext">${esc(c.hint)}</span>`, subPrompt:"이 설명에 해당하는 나라는?", svgAfter: WPATH[c.iso]? worldSVG(c.iso) : null, explain:ctryExplain(c)};
+    const more = (c.feats||[]).filter(x=>x!==h).slice(0,2);
+    return {...k, tag:"나라의 특징", prompt:`<span class="qtext">${esc(h)}</span>`, subPrompt:"이 설명에 해당하는 나라는?", svgAfter: WPATH[c.iso]? worldSVG(c.iso) : null,
+            explain:ctryExplain({...c, hint:null}) + (more.length? `<br><span class="muted">다른 특징: ${more.map(esc).join(" / ")}</span>` : "")};
   },
   climOndo(st, r){
     const k = mk(st.k, climWrong(st.k, r), r, x=>({main:`${x} ${CLIM_NAME[x][0]}`, sub:CLIM_NAME[x][1]}));
@@ -938,13 +943,14 @@ function chronoExplain(list, key){
 }
 function itemId(setId, it){ return it.n ? "P"+String(it.n).padStart(2,"0") : it.id; }
 function itemName(it){ return it.n ? it.ja : (it.ko || it.q || it.ja); }
-function itemLabel(it){ const t = it.n ? it.ko : (it.ko || it.q || it.ja); return t.length>42 ? t.slice(0,40)+"…" : t; }
+function itemLabel(it){ const t = it.n ? it.ko : it.fh ? it.ko+" — "+it.fh : (it.ko || it.q || it.ja); return t.length>42 ? t.slice(0,40)+"…" : t; }
 
 function planSet(set, n, seed){
   if(set.composite) return planComposite(set, n, seed);
   const r = rngFrom(seed);
   const pool = set.pool();
-  const items = weightedSample(pool, set.w, Math.min(n, pool.length), r);
+  let items = weightedSample(pool, set.w, Math.min(set.uniq? n*4 : n, pool.length), r);
+  if(set.uniq){ const seen=new Set(); items = items.filter(it=>{ const k=set.uniq(it); if(seen.has(k)) return false; seen.add(k); return true; }).slice(0, n); }
   return items.map(it=>{
     let kind;
     if(set.kinds==="chrono"){
@@ -964,11 +970,11 @@ function planComposite(set, n, seed){
   set.composite.forEach((part,pi)=>{
     const subs = part.sets.map(setById);
     for(let k=0;k<q[pi];k++){
-      const sub = weightedSample(subs, s=>s.pool().length, 1, r)[0];
-      const cand = sub.pool().filter(it=>!used.has(itemId(sub.id,it)) && !(sub.id.startsWith("w-") && it.jp && hasJH));   // 통합본: 일본연표에 있는 사건은 세계연표 쪽에서 빼서 중복 방지
+      const sub = weightedSample(subs, s=>s.size? s.size() : s.pool().length, 1, r)[0];
+      const cand = sub.pool().filter(it=>!used.has(itemId(sub.id,it)) && !(sub.uniq && used.has("u:"+sub.id+":"+sub.uniq(it))) && !(sub.id.startsWith("w-") && it.jp && hasJH));   // 통합본: 일본연표에 있는 사건은 세계연표 쪽에서 빼서 중복 방지
       const pl = planSet({...sub, pool:()=>cand}, 1, Math.floor(r()*1e9))[0];
       if(!pl) continue;
-      used.add(itemId(sub.id, pl.it)); out.push({...pl, sid:sub.id});
+      used.add(itemId(sub.id, pl.it)); if(sub.uniq) used.add("u:"+sub.id+":"+sub.uniq(pl.it)); out.push({...pl, sid:sub.id});
     }
   });
   return shuffle(out, r);
