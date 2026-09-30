@@ -104,6 +104,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .names button[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 .seg{display:flex;gap:6px;background:var(--paper-2);border:0;border-radius:14px;padding:4px}
 .seg button{flex:1;border:0;background:none;border-radius:11px;padding:10px 4px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.chips .clschip{background:var(--go);color:var(--go-ink)}
 .seg button .ck{display:block;font-size:10px;font-weight:600;letter-spacing:.04em;opacity:.7;margin-bottom:1px}
 .seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 4px 10px rgba(120,90,200,.15)}
 
@@ -990,7 +991,8 @@ const home = () => mode==="class" ? "entry" : "practice";
 let S = null;         // 퀴즈 진행 상태
 const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
 let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : home();
-let entry = {cls: params.get("c") || store.get("lastCls", preset.c), name: store.get("lastName", null)}; if(!okName(entry.name)) entry.name=null;
+const clsFixed = ()=> !!CONFIG.classes[preset.c];   // QR(강사 설정)에 반이 들어 있으면 학생은 반을 고르지 않음
+let entry = {cls: clsFixed()? preset.c : (params.get("c") || store.get("lastCls", preset.c)), name: store.get("lastName", null)}; if(!okName(entry.name)) entry.name=null;
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
@@ -1036,12 +1038,12 @@ function renderEntry(){
       <span class="eyebrow">오늘의 퇴실 퀴즈 · ${korDateShort()}</span>
       <h1>${esc(set.name)}</h1>
       <div class="meta"><span><b>${preset.n}</b>문항</span><span>한 번에 다 맞혀야 퇴실</span><span>틀리면 처음부터</span></div>
-      <div class="chips">${set.composite? set.composite.map(c=>`<span>${esc(c.label)}</span>`).join("") : `<span>${esc(set.group)}</span>`}</div>
+      <div class="chips">${clsFixed()? `<span class="clschip">${esc(preset.c)}</span>` : ""}${set.composite? set.composite.map(c=>`<span>${esc(c.label)}</span>`).join("") : `<span>${esc(set.group)}</span>`}</div>
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
-      <div class="field"><span class="lbl">반</span>
+      ${clsFixed()? "" : `<div class="field"><span class="lbl">반</span>
         <div class="seg" role="group" aria-label="반 선택">${Object.keys(CONFIG.classes).map(c=>`<button data-cls="${esc(c)}" aria-pressed="${c===entry.cls}">${clsBtn(c)}</button>`).join("")}</div>
-      </div>
+      </div>`}
       <div class="field"><label for="name">이름</label>
         <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="이름을 입력하세요" value="${esc(entry.name||"")}">
       </div>
@@ -1105,6 +1107,7 @@ function bindPractice(){
 function clsBtn(c){ const k=(CONFIG.classKind||{})[c]; return k&&k!==c? `<span class="ck">${esc(k)}</span>${esc(c)}` : esc(c); }
 function startQuiz(practice){
   if(!entry.name) return;
+  if(!practice && clsFixed()) entry.cls = preset.c;
   store.set("lastName", entry.name); if(!practice) store.set("lastCls", entry.cls);
   const set=setById(practice? prac.set : preset.set);
   const nWant = practice? prac.n : preset.n;
