@@ -485,7 +485,7 @@ const SETS = [
   {id:"jp-pref",    group:"일본 지리", subj:"geo", name:"토도부현",       pool:()=>PREFS, w:p=>SW[p.star], kinds:["mapPref"]},
   {id:"jp-feature", group:"일본 지리", subj:"geo", name:"토도부현 특징",   pool:()=>PREFS.filter(p=>prefClues(p).length), w:p=>SW[p.star], kinds:["prefHint"]},
   {id:"jp-capital", group:"일본 지리", subj:"geo", name:"현청소재지",     pool:()=>PREFS.filter(p=>p.diff), w:p=>1, kinds:["prefCapital","capitalPref","mapCapital"]},   // 현 이름과 현청소재지 이름이 다른 18곳만 (2026-09-30)
-  {id:"jp-land",    group:"일본 지리", subj:"geo", name:"일본 지형",           pool:()=>LANDC, w:x=>1, kinds:x=>x.xy ? ["landMap","landMap","landPref","prefLand"] : ["landPref","landPref","prefLand"]},
+  {id:"jp-land",    group:"일본 지리", subj:"geo", name:"일본 지형",           pool:()=>LANDC, w:x=>1, kinds:x=>x.t==="해류" ? ["jpCurrent"] : x.xy ? ["landMap","landMap","landPref","prefLand"] : ["landPref","landPref","prefLand"]},   // 출제 대상 = build/landforms_pick.txt (사용자 지정)
   {id:"g-country",  group:"세계 지리", subj:"geo", name:"나라 위치", pool:()=>CTRY.filter(c=>WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryMap"]},
   {id:"g-capital",  group:"세계 지리", subj:"geo", name:"수도", pool:()=>CTRY.filter(c=>c.cap && WPATH[c.iso]), w:c=>c.core?3:1, kinds:["countryCapital","capitalCountry"]},
   {id:"g-feature",  group:"세계 지리", subj:"geo", name:"나라의 특징", pool:()=>CFEAT, w:f=>(f.base.core?2:1)/Math.sqrt(f.base.feats?f.base.feats.length:1), uniq:f=>f.iso, size:()=>new Set(CFEAT.map(f=>f.iso)).size, kinds:["countryHint"]},   // 통합본 비중은 나라 수 기준
@@ -750,14 +750,24 @@ const BUILD = {
   },
   prefLand(x, r){
     const p = prefByN(pick(x.p, r));
-    const others = shuffle(LANDC.filter(y=>y!==x && !y.p.includes(p.n) && y.t===x.t), r);
-    const rest = shuffle(LANDC.filter(y=>y!==x && !y.p.includes(p.n)), r);
+    const others = shuffle(LANDC.filter(y=>y!==x && y.p.length && !y.p.includes(p.n) && y.t===x.t), r);
+    const rest = shuffle(LANDC.filter(y=>y!==x && y.p.length && !y.p.includes(p.n)), r);
     const w=[]; for(const y of [...others,...rest]){ if(w.length>=3) break; if(!w.includes(y)) w.push(y); }
     const c = mk(x, w, r, y=>({main:y.ja, sub:y.ko, ja:true}));
     return {...c, tag:x.t, prompt:`다음 중 <span class="big ja">${esc(p.ja)}</span>에 있는 것은?`,
       explain:`<b class="ja">${esc(x.ja)}</b>(${esc(x.ko)}) — ${esc(x.t)} · <span class="ja">${esc(p.ja)}</span><br><span class="muted">${esc(x.note)}</span><br><span class="muted">${w.map(y=>`${esc(y.ja)} → ${y.p.map(n=>esc(prefByN(n).ja)).join("·")}`).join(" / ")}</span>`, mapAfter:[p.n]};
   },
 
+  jpCurrent(x, r){   // 일본 주변 해류 4개 — 설명을 보고 해류 고르기
+    const Q = { "黒潮":["일본 열도의 태평양 쪽을 따라 북상하는 난류는?","일본 남쪽 바다를 흐르며 태평양 쪽 연안을 따뜻하게 하는 큰 난류는?"],
+                "対馬海流":["동해(일본해) 쪽을 따라 북상하는 난류는?","겨울 계절풍에 수증기를 공급해 동해 쪽 지역에 많은 눈을 내리게 하는 난류는?"],
+                "親潮":["일본 열도의 태평양 쪽을 따라 남하하는 한류는?","산리쿠 앞바다에서 구로시오와 만나 좋은 어장(조경)을 만드는 한류는?"],
+                "リマン海流":["동해(일본해) 쪽을 따라 남하하는 한류는?","연해주 연안을 따라 남하하는 한류는?"] };
+    const all = LAND.filter(y=>y.t==="해류");
+    const c = mk(x, all.filter(y=>y!==x), r, y=>({main:y.ja, sub:y.ko, ja:true}));
+    return {...c, tag:"해류", prompt:pick(Q[x.ja]||[x.note], r),
+      explain:`<b class="ja">${esc(x.ja)}</b>(${esc(x.ko)}) — ${esc(x.note)}<br><span class="muted">난류: 黒潮·対馬海流 / 한류: 親潮·リマン海流</span>`};
+  },
   landMap(x, r){
     const line = x.xy.length>1;
     const fill = shuffle(LANDM.filter(y=>y!==x && y.t!==x.t && (y.xy.length>1)===line), r).sort((a,b)=>(b.t==="산맥")-(a.t==="산맥"));   // 구조선 오답은 산맥부터

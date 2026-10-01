@@ -165,7 +165,7 @@ def build_landforms(prefs):
     for line in open(os.path.join(HERE, 'landforms.txt'), encoding='utf-8').read().strip().split('\n'):
         if not line.strip() or line.startswith('#'): continue
         t, ja, ko, pr, note = line.split('|')
-        items.append(dict(t=t, ja=ja, ko=ko, p=P(*pr.split(',')), note=note))
+        items.append(dict(t=t, ja=ja, ko=ko, p=P(*pr.split(',')) if pr.strip() else [], note=note))
     return items
 
 def core_landform_names(d):
@@ -195,6 +195,16 @@ def core_landform_names(d):
     return toks
 
 def mark_core(lands, d):
+    """「일본 지형」 세트 출제 대상(core). landforms_pick.txt 가 있으면 그 목록만 (2026-10-01 사용자 지정), 없으면 자료집 요약표 기준."""
+    pick = os.path.join(HERE, 'landforms_pick.txt')
+    if os.path.exists(pick):
+        names = [l.split('#')[0].strip() for l in open(pick, encoding='utf-8')]
+        names = [n for n in names if n]
+        have = {x['ja'] for x in lands}
+        miss = [n for n in names if n not in have]; assert not miss, ('landforms_pick.txt 에 없는 지형', miss)
+        for x in lands:
+            if x['ja'] in names: x['core'] = 1
+        return lands
     toks = core_landform_names(d)
     EXTRA = {'琵琶湖', '豊後水道'}   # 요약표 본문에 나오는 이름(淀川 발원지 琵琶湖) · 해협 줄의 「豊後」
     for x in lands:
