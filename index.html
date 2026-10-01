@@ -104,6 +104,10 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .names button[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 .seg{display:flex;gap:6px;background:var(--paper-2);border:0;border-radius:14px;padding:4px}
 .seg button{flex:1;border:0;background:none;border-radius:11px;padding:10px 4px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.confirmcard{display:flex;flex-direction:column;gap:10px;text-align:center;align-items:center;border:2px solid var(--go)}
+.confirmcard .cf-name{font-family:var(--f-disp);font-size:28px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
+.confirmcard .clschip2{font-size:13px;font-weight:700;background:var(--go);color:var(--go-ink);border-radius:999px;padding:4px 10px;font-family:inherit}
+.confirmcard .cf-row{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;width:100%}
 .chips .clschip{background:var(--go);color:var(--go-ink)}
 .seg button .ck{display:block;font-size:10px;font-weight:600;letter-spacing:.04em;opacity:.7;margin-bottom:1px}
 .seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 4px 10px rgba(120,90,200,.15)}
@@ -523,7 +527,11 @@ const MNAME = {"jp-his":"일본 연표", "w-pol":"세계 연표 · 정치", "w-e
 const mname = s => MNAME[s.id] || s.name;
 const menuList = pred => MENU.map(m=>({menu:m.menu, sets:m.ids.map(id=>SETS.find(x=>x.id===id)).filter(x=>x && pred(x))})).filter(m=>m.sets.length);
 // 이름: 완성된 한글(또는 영문) 2~20자만 — 「.」 「기ㅁ현수」처럼 잘못 친 이름은 시작 버튼이 안 눌림
-const okName = v => /^[가-힣A-Za-z][가-힣A-Za-z ]{1,19}$/.test(v||"");
+// 이름: 한글 2~5글자, 실제 성씨로 시작 (2026-10-01 — 「깅이이」「.」 같은 이름 막기)
+const SUR1 = "김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부봉승호태빈곡계견간",
+      SUR2 = ["남궁","황보","제갈","선우","독고","사공","서문","동방"];
+const okName = v => { v = String(v||""); if(!/^[가-힣]{2,5}$/.test(v)) return false; return SUR2.some(x=>v.startsWith(x) && v.length>=3) || SUR1.includes(v[0]); };
+const nameMsg = v => !v ? "이름을 먼저 입력하세요" : /\s/.test(v) ? "띄어쓰기 없이 써 주세요 (예: 김하늘)" : !/^[가-힣]+$/.test(v) ? "한글로 써 주세요 (예: 김하늘)" : "성과 이름을 정확히 써 주세요 (예: 김하늘)";
 const okSet = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon ? id : "all"; };
 const PRAC_SETS = () => SETS.filter(x=>!x.soon && !x.teacherOnly);   // 학생 혼자 연습 목록
 const okPrac = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon && !s.teacherOnly ? id : PRAC_SETS()[0].id; };
@@ -997,8 +1005,8 @@ function buildQ(set, plan, seed){
 
 /* ───────── 상태 ───────── */
 const params = new URLSearchParams(location.search);
-let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:"화목반", date:""});
-if(params.get("set")){ preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||preset.c, date:today()}; store.set("preset2", preset); }
+let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:null, date:""});
+if(params.get("set")){ preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||null, date:today()}; store.set("preset2", preset); }   // QR에 반이 없으면 학생이 고름
 // QR(주소에 set=)로 들어왔거나 오늘 받은 세트가 있으면 수업 모드, 아니면 혼자 연습 모드
 let mode = (params.get("set") || preset.date===today()) ? "class" : "practice";
 let prac = store.get("prac", {set:"jp-region", n:10});
@@ -1008,7 +1016,7 @@ let S = null;         // 퀴즈 진행 상태
 const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
 let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : home();
 const clsFixed = ()=> !!CONFIG.classes[preset.c];   // QR(강사 설정)에 반이 들어 있으면 학생은 반을 고르지 않음
-let entry = {cls: clsFixed()? preset.c : (params.get("c") || store.get("lastCls", preset.c)), name: store.get("lastName", null)}; if(!okName(entry.name)) entry.name=null;
+let entry = {cls: clsFixed()? preset.c : (CONFIG.classes[params.get("c")]? params.get("c") : null), name: store.get("lastName", null), raw:"", confirm:false}; if(!okName(entry.name)) entry.name=null;   // QR에 반이 없으면 학생이 직접 골라야 함(기본값 없음)
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
@@ -1061,22 +1069,52 @@ function renderEntry(){
         <div class="seg" role="group" aria-label="반 선택">${Object.keys(CONFIG.classes).map(c=>`<button data-cls="${esc(c)}" aria-pressed="${c===entry.cls}">${clsBtn(c)}</button>`).join("")}</div>
       </div>`}
       <div class="field"><label for="name">이름</label>
-        <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="이름을 입력하세요" value="${esc(entry.name||"")}">
+        <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="성과 이름 (예: 김하늘)" value="${esc(entry.name||entry.raw||"")}">
       </div>
       ${hist.length?`<div class="muted" style="font-size:13px">지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
-    <button class="btn" id="start" ${entry.name?"":"disabled"}>${entry.name? "시작하기" : "이름을 먼저 입력하세요"}</button>
+    ${startArea(false)}
     <div class="linkrow"><button class="linkbtn" id="to-rank">🏆 퇴실 퀴즈 랭킹 →</button><button class="linkbtn" id="to-prac">집에서 혼자 연습하기 →</button></div>
   </div>`;
+}
+// 시작 버튼 — 반·이름이 맞아야 눌림. 이 기기에서 처음 쓰는 이름이면 한 번 확인받고 시작
+function gateMsg(practice){
+  if(!practice && !CONFIG.classes[entry.cls]) return "반을 먼저 고르세요";
+  if(!entry.name) return nameMsg(entry.raw);
+  return "";
+}
+function startArea(practice){
+  const msg = gateMsg(practice);
+  if(entry.confirm && !msg) return `<section class="card confirmcard" role="alertdialog" aria-label="이름 확인">
+      <span class="eyebrow">이름 확인</span>
+      <div class="cf-name">${esc(entry.name)}${practice? "" : ` <span class="clschip2">${esc(entry.cls)}</span>`}</div>
+      <p class="muted" style="margin:0;font-size:13px">퇴실증·선생님 기록·랭킹에 이 이름${practice?"":"과 반"}으로 남아요. 맞나요?</p>
+      <div class="cf-row"><button class="btn ghost" id="cf-no">다시 쓸게요</button><button class="btn" id="cf-yes">맞아요, 시작</button></div>
+    </section>`;
+  return `<button class="btn" id="start" ${msg?"disabled":""}>${msg || (practice? "연습 시작" : "시작하기")}</button>`;
+}
+function bindStart(practice){
+  const ni=$("#name");
+  const upd=()=>{ const st=$("#start"); if(!st) return; const m=gateMsg(practice); st.disabled=!!m; st.textContent=m || (practice? "연습 시작" : "시작하기"); };
+  if(ni){
+    ni.oninput=()=>{ const v=ni.value.trim(); entry.raw=v; entry.name=okName(v)? v : null; if(entry.confirm){ entry.confirm=false; render(); $("#name").focus(); return; } upd(); };
+    ni.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); tryStart(practice); } };
+  }
+  const st=$("#start"); if(st) st.onclick=()=>tryStart(practice);
+  const y=$("#cf-yes"), n=$("#cf-no");
+  if(y) y.onclick=()=>{ entry.confirm=false; startQuiz(practice); };
+  if(n) n.onclick=()=>{ entry.confirm=false; render(); const x=$("#name"); if(x){ x.focus(); x.select(); } };
+}
+function tryStart(practice){
+  if(gateMsg(practice)) return;
+  if(entry.name !== store.get("lastName", null) || (!practice && entry.cls !== store.get("lastCls", null))){ entry.confirm=true; render(); return; }
+  startQuiz(practice);
 }
 function bindEntry(){
   const tp=$("#to-prac"); if(tp) tp.onclick=()=>{ mode="practice"; go("practice"); };
   const tr=$("#to-rank"); if(tr) tr.onclick=()=>openRank("cls", "entry");
-  document.querySelectorAll("[data-cls]").forEach(b=>b.onclick=()=>{ entry.cls=b.dataset.cls; render(); });
-  const ni=$("#name"), st0=$("#start");
-  if(ni){ ni.oninput=()=>{ const v=ni.value.trim().replace(/\s+/g," "); entry.name=okName(v)? v : null; st0.disabled=!entry.name; st0.textContent=entry.name?"시작하기":(v?"이름을 정확히 써 주세요 (예: 김하늘)":"이름을 먼저 입력하세요"); };
-          ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(); }; }
-  const st=$("#start"); if(st) st.onclick=()=>startQuiz(false);
+  document.querySelectorAll("[data-cls]").forEach(b=>b.onclick=()=>{ entry.cls=b.dataset.cls; entry.confirm=false; render(); });
+  bindStart(false);
 }
 
 /* ───────── 화면: 혼자 연습 ───────── */
@@ -1099,11 +1137,11 @@ function renderPractice(){
         <div class="seg" role="group" aria-label="문항 수">${[10,20,30].map(n=>`<button data-pn="${n}" aria-pressed="${n===prac.n}">${n}</button>`).join("")}</div>
       </div>
       <div class="field"><label for="name">이름</label>
-        <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="이름을 입력하세요" value="${esc(entry.name||"")}">
+        <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="성과 이름 (예: 김하늘)" value="${esc(entry.name||entry.raw||"")}">
       </div>
       ${hist.length?`<div class="muted" style="font-size:13px">이 범위 지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
-    <button class="btn" id="start" ${entry.name?"":"disabled"}>${entry.name? "연습 시작" : "이름을 먼저 입력하세요"}</button>
+    ${startArea(true)}
     <div class="linkrow"><button class="linkbtn" id="to-mine">내 기록 보기 →</button><button class="linkbtn" id="to-rank">🏆 연습 랭킹 →</button></div>
     ${hasClass?`<div style="text-align:center"><button class="linkbtn" id="to-class">오늘 퇴실 퀴즈로 →</button></div>`:`<p class="muted" style="text-align:center;font-size:12px">수업 퇴실 퀴즈는 선생님이 띄운 QR로 들어오세요.</p>`}
   </div>`;
@@ -1111,10 +1149,7 @@ function renderPractice(){
 function bindPractice(){
   $("#psel").onchange=e=>{ prac={...prac, set:e.target.value}; store.set("prac", prac); render(); };
   document.querySelectorAll("[data-pn]").forEach(b=>b.onclick=()=>{ prac={...prac, n:+b.dataset.pn}; store.set("prac", prac); render(); });
-  const ni=$("#name"), st0=$("#start");
-  ni.oninput=()=>{ const v=ni.value.trim().replace(/\s+/g," "); entry.name=okName(v)? v : null; st0.disabled=!entry.name; st0.textContent=entry.name?"연습 시작":(v?"이름을 정확히 써 주세요 (예: 김하늘)":"이름을 먼저 입력하세요"); };
-  ni.onkeydown=e=>{ if(e.key==="Enter" && entry.name) startQuiz(true); };
-  st0.onclick=()=>startQuiz(true);
+  bindStart(true);
   const tc=$("#to-class"); if(tc) tc.onclick=()=>{ mode="class"; go("entry"); };
   $("#to-mine").onclick=()=>openMine("practice");
   $("#to-rank").onclick=()=>openRank("prac", "practice");
@@ -1122,7 +1157,7 @@ function bindPractice(){
 
 function clsBtn(c){ const k=(CONFIG.classKind||{})[c]; return k&&k!==c? `<span class="ck">${esc(k)}</span>${esc(c)}` : esc(c); }
 function startQuiz(practice){
-  if(!entry.name) return;
+  if(!entry.name || gateMsg(practice)) return;
   if(!practice && clsFixed()) entry.cls = preset.c;
   store.set("lastName", entry.name); if(!practice) store.set("lastCls", entry.cls);
   const set=setById(practice? prac.set : preset.set);
@@ -1469,7 +1504,7 @@ function bindRank(){
 let rankTimer=null;
 
 /* ───────── 강사 화면 ───────── */
-let tstate = {cls:preset.c, set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem("kitaku.ttab")||"set"; }catch(e){ return "set"; } })()};
+let tstate = {cls:preset.c || Object.keys(CONFIG.classes)[0], set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem("kitaku.ttab")||"set"; }catch(e){ return "set"; } })()};
 function studentURL(){
   const onPages = /github\.io$/.test(location.hostname);
   const base = onPages ? location.origin+location.pathname : CONFIG.plannedBase;
