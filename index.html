@@ -419,8 +419,8 @@ const CONFIG = {
   statsUrl: "https://script.google.com/macros/s/AKfycbytdU_JiEpriYaMUKX3H9mpm0TjdFJ29Nu-zDm1QGyUQ7SWRdYahyf2_FujMYDMzZ08/exec",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
   secret: "kitaku-2026",
   teacherPinHash: 189797738,       // 강사 화면 PIN의 hashStr 값 (초기 PIN 7350). 바꾸려면 콘솔에서 hashStr("새PIN") 실행 후 여기 붙여넣기
-  classes: { "토일반": [], "화목반": [], "개념반": [] },   // 반 이름 (학생 이름은 본인이 입력) — 시트·랭킹에 이 이름 그대로 찍힘
-  classKind: { "토일반":"실전반", "화목반":"실전반", "개념반":"개념반" },   // 반 버튼 위 작은 글씨
+  classes: { "토일반": [], "화목반": [], "개념반": [], "단풀반": [] },   // 반 이름 (학생 이름은 본인이 입력) — 시트·랭킹에 이 이름 그대로 찍힘
+  classKind: { "토일반":"실전반", "화목반":"실전반", "개념반":"개념반", "단풀반":"단풀반" },   // 반 버튼 위 작은 글씨
   form: {                          // 구글 폼 「帰宅クイズ 기록」 (비우면 이 기기에만 저장)
     url: "https://docs.google.com/forms/d/e/1FAIpQLSemiDuYKbrHDiZTOfmAiOC2cex5Eo5zgWYsxRKfBBTARWng9Q/formResponse",
     fields: { name:"entry.1954971135", cls:"entry.1556659008", set:"entry.1257529705", first:"entry.2027853110", time:"entry.761713755", wrong:"entry.428638031", rounds:"entry.1047549204" }
