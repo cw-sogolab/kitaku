@@ -470,9 +470,11 @@ const SUBJ = { geo:["지리","var(--c-geo)"], his:["역사","var(--c-his)"], pol
 const FIELD2SUBJ = {"정치":"pol","경제":"eco","현대사회":"soc","역사":"his","지리":"geo"};
 const conW = x => 1;
 
+// 통합본 안 「일본 지리」 세부 비중 — 2026-10-04 사용자 요청: 8지방 구분↓, 토도부현 특징·일본 지형↑ (숫자는 서로의 비율)
+const JPGEO_W = {"jp-region":1, "jp-pref":2, "jp-feature":3, "jp-capital":1, "jp-land":3};
 const SETS = [
   {id:"all", group:"통합본", subj:"all", name:"전 범위 통합", composite:[
-      {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
+      {label:"일본 지리", share:.20, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"], wts:JPGEO_W},
       {label:"세계 지리", share:.15, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]},
       {label:"일본 연표", share:.15, sets:["jp-his"]},
       {label:"세계 연표", share:.20, sets:["w-pol","w-eco","w-soc","w-his","w-geo"]},
@@ -480,7 +482,7 @@ const SETS = [
     ], pool:()=>[...PREFS, ...JPH, ...(CONFIG.worldChrono? WORLD : []), ...LAND, ...CON, ...CTRY, ...CLIM, ...WLAND, ...WSTAT]},
   // 일본·세계 전체 통합 — 퇴실 퀴즈용, 강사 화면에서만 보임
   {id:"mix-jp", group:"통합본", subj:"geo", name:"일본 전체 통합", teacherOnly:true, composite:[
-      {label:"일본 지리", share:.6, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"]},
+      {label:"일본 지리", share:.6, sets:["jp-region","jp-pref","jp-feature","jp-capital","jp-land"], wts:JPGEO_W},
       {label:"일본 연표", share:.4, sets:["jp-his"]} ], pool:()=>[...PREFS, ...LAND, ...JPH]},
   {id:"mix-w",  group:"통합본", subj:"geo", name:"세계 전체 통합", teacherOnly:true, composite:[
       {label:"세계 지리", share:.5, sets:["g-country","g-capital","g-feature","g-land","g-climate","g-stat"]},
@@ -988,7 +990,7 @@ function planComposite(set, n, seed){
   set.composite.forEach((part,pi)=>{
     const subs = part.sets.map(setById);
     for(let k=0;k<q[pi];k++){
-      const sub = weightedSample(subs, s=>s.size? s.size() : s.pool().length, 1, r)[0];
+      const sub = weightedSample(subs, s=>part.wts? (part.wts[s.id]||0) : s.size? s.size() : s.pool().length, 1, r)[0];   // wts가 있으면 그 비율, 없으면 문항 수 비례
       const cand = sub.pool().filter(it=>!used.has(itemId(sub.id,it)) && !(sub.uniq && used.has("u:"+sub.id+":"+sub.uniq(it))) && !(sub.id.startsWith("w-") && it.jp && hasJH));   // 통합본: 일본연표에 있는 사건은 세계연표 쪽에서 빼서 중복 방지
       const pl = planSet({...sub, pool:()=>cand}, 1, Math.floor(r()*1e9))[0];
       if(!pl) continue;
