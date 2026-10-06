@@ -234,6 +234,7 @@ if __name__ == '__main__':
                 landforms=lands, concept=build_concept(),
                 wmap=geo['wmap'], countries=geo['countries'], climate=geo['climate'],
                 meta=dict(built=__import__('datetime').date.today().isoformat()))
+    from llpoints import build_ll; data['wll'] = build_ll()   # 세계 지형 위경도 문항 (geo/llpoints.py)
     if a.wg:
         from build_wgeo import build_wgeo
         wg = build_wgeo(a.wg); data.update(wland=wg['wland'], wstat=wg['wstat'], wbelts=wg['belts'])
