@@ -769,13 +769,13 @@ function gmap(o){
   const lonEvery=Math.max(1, Math.ceil(fsLon*4.0/(stL*cs))), latEvery=Math.max(1, Math.ceil(fs*1.6/st));
   const sw=`style="stroke-width:${(w/150).toFixed(2)}"`;
   for(let la=Math.ceil(latB/st)*st; la<=latT; la+=st){
-    const yy=-la; grid+=`<line class="llg${la===0?" eq":""}" x1="${vx}" x2="${vx+w}" y1="${yy}" y2="${yy}"/>`;
-    if(Math.round(la/st)%latEvery===0 && yy>vy+h*0.06 && yy<vy+h*0.92) labs+=`<text class="lll" ${sw} x="${(vx+w*0.012).toFixed(2)}" y="${(yy-w*0.008).toFixed(2)}" font-size="${fs.toFixed(2)}">${llTag(la,true)}</text>`;
+    const yy=-la; grid+=`<line class="llg${la===0&&!o.bare?" eq":""}" x1="${vx}" x2="${vx+w}" y1="${yy}" y2="${yy}"/>`;
+    if(!o.bare && Math.round(la/st)%latEvery===0 && yy>vy+h*0.06 && yy<vy+h*0.92) labs+=`<text class="lll" ${sw} x="${(vx+w*0.012).toFixed(2)}" y="${(yy-w*0.008).toFixed(2)}" font-size="${fs.toFixed(2)}">${llTag(la,true)}</text>`;
   }
   const nlon = v => v>180 ? v-360 : v<-180 ? v+360 : v;   // 날짜변경선 너머 표기
   for(let lo=Math.ceil(lonL/stL)*stL; lo<=lonR; lo+=stL){
-    const xx=(lo-lon0)*cs; grid+=`<line class="llg${lo===0?" eq":""}" x1="${xx}" x2="${xx}" y1="${vy}" y2="${vy+h}"/>`;
-    if(Math.round(lo/stL)%lonEvery===0 && xx>vx+w*0.08 && xx<vx+w*0.95) labs+=`<text class="lll" ${sw} text-anchor="middle" x="${xx.toFixed(2)}" y="${(vy+h-w*0.012).toFixed(2)}" font-size="${fsLon.toFixed(2)}">${llTag(nlon(lo),false)}</text>`;
+    const xx=(lo-lon0)*cs; grid+=`<line class="llg${lo===0&&!o.bare?" eq":""}" x1="${xx}" x2="${xx}" y1="${vy}" y2="${vy+h}"/>`;
+    if(!o.bare && Math.round(lo/stL)%lonEvery===0 && xx>vx+w*0.08 && xx<vx+w*0.95) labs+=`<text class="lll" ${sw} text-anchor="middle" x="${xx.toFixed(2)}" y="${(vy+h-w*0.012).toFixed(2)}" font-size="${fsLon.toFixed(2)}">${llTag(nlon(lo),false)}</text>`;
   }
   let feat="";
   (o.lines||[]).forEach(l=>{ const q=l.map(([lo,la])=>P(lo,la));
@@ -790,7 +790,7 @@ function gmap(o){
       + (q.lab? `<g class="llab"><rect style="stroke-width:${(0.8*u).toFixed(2)}" x="${(px+6*u).toFixed(2)}" y="${(py-19*u).toFixed(2)}" width="${(17*u).toFixed(2)}" height="${(17*u).toFixed(2)}" rx="${(4*u).toFixed(2)}"/><text x="${(px+14.5*u).toFixed(2)}" y="${(py-6.3*u).toFixed(2)}" text-anchor="middle" font-size="${(12.5*u).toFixed(2)}">${q.lab}</text></g>` : ""); });
   return `<svg class="wmap wfeat llmap" data-every="${lonEvery},${latEvery}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}" role="img" aria-label="위선·경선이 그려진 세계 지도"><rect class="sea" x="${vx-1}" y="${vy-1}" width="${w+2}" height="${h+2}"/><g class="lland" style="stroke-width:${(w/320).toFixed(3)}">${paths}</g><g style="stroke-width:${(w/420).toFixed(3)}">${grid}</g>${feat}${labs}</svg>`;   // 눈금 글자는 맨 위
 }
-const llSVG = (x, pts) => gmap({view:x.view, step:x.step, pts});
+const llSVG = (x, pts, bare) => gmap({view:x.view, step:x.step, pts, bare});   // bare: 문제 화면용 — 눈금 숫자 없이 선만
 // 위경도를 묻는 개념(기출) 문항 — 답한 뒤 격자 지도로 확인 (글로도·지도로도 알도록)
 const CMAP = {
   "2018-1-Q21": {view:[50,72,0,45], hl:"246"},                                                        // 핀란드: 북위·동경
@@ -901,7 +901,7 @@ const BUILD = {
     const wr = llNeighbors(x, r).slice(0,3);
     const opts = shuffle([[x.lat,x.lon], ...wr], r);
     return {choices:opts.map(([la,lo])=>({main:llTxt(la,lo)})), answer:opts.findIndex(p=>p[0]===x.lat&&p[1]===x.lon), tag:"위도·경도",
-      prompt:`지도의 <span style="color:var(--map-hl)">빨간 점</span>은 <b>${esc(x.ko)}</b>에 있어요. 이 점의 위도·경도는?`, svg:llSVG(x,[{lat:x.lat,lon:x.lon,ring:true}]),
+      prompt:`지도의 <span style="color:var(--map-hl)">빨간 점</span>은 <b>${esc(x.ko)}</b>에 있어요. 이 점의 위도·경도는?`, svg:llSVG(x,[{lat:x.lat,lon:x.lon,ring:true}], true), svgAfter:llSVG(x,[{lat:x.lat,lon:x.lon,ring:true}]),
       explain:`<b>${esc(x.ko)}</b> — ${esc(llTxt(x.lat,x.lon))}<br><span class="muted">${esc(x.note)}</span>`};
   },
   llName(x, r){   // 지도 없이 글로: 위경도 → 어디? (답한 뒤 지도)
@@ -923,7 +923,7 @@ const BUILD = {
     const ans = all.findIndex(p=>p[0]===x.lat&&p[1]===x.lon);
     const pts = all.map((p,i)=>({lat:p[0], lon:p[1], lab:L[i]}));
     return {choices:all.map((p,i)=>({main:L[i], sub:""})), answer:ans, tag:"위도·경도",
-      prompt:`<b>${esc(llTxt(x.lat,x.lon))}</b>에 해당하는 점은 A~D 중 어느 것일까?`, svg:llSVG(x, pts),
+      prompt:`<b>${esc(llTxt(x.lat,x.lon))}</b>에 해당하는 점은 A~D 중 어느 것일까?`, svg:llSVG(x, pts, true), svgAfter:llSVG(x, pts),
       explain:`정답 <b>${L[ans]}</b> — ${esc(x.ko)} (${esc(llTxt(x.lat,x.lon))})<br><span class="muted">${esc(x.note)}</span><br><span class="muted">${all.map((p,i)=>i===ans?"":`${L[i]}: ${llTxt(p[0],p[1])}`).filter(Boolean).join(" / ")}</span>`};
   },
   countryMap(c, r){
@@ -1352,7 +1352,7 @@ function renderQuiz(){
       <div class="qtag"><span class="chip" style="--c:${sc}">${esc(qs.group)}${S.set.composite&&qs.id.startsWith("w-")?" · "+esc(qs.name):""}</span><span>${esc(q.tag)}</span></div>
       <div class="prompt">${q.prompt}${q.subPrompt?`<span style="display:block;font-size:16px;margin-top:6px">${q.subPrompt}</span>`:""}</div>
       ${showMap?`<div class="mapbox">${mapSVG(mapIds,{ring:q.ring})}</div>`:""}
-      ${q.svg?`<div class="mapbox">${q.svg}</div>`:""}${S.answered && q.svgAfter?`<div class="mapbox">${q.svgAfter}</div>`:""}
+      ${q.svg?`<div class="mapbox">${S.answered && q.svgAfter? q.svgAfter : q.svg}</div>`:""}${S.answered && q.svgAfter && !q.svg?`<div class="mapbox">${q.svgAfter}</div>`:""}
       <div class="choices${(showMap||q.svg) && !q.order && q.choices.every(c=>String(c.main).length<=8) ? " grid2":""}">${choices}</div>
       ${fb}
     </section>
