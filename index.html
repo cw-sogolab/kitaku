@@ -411,7 +411,7 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 <main id="app" aria-live="polite"></main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="data.js"></script>
+<script src="data.js?v=3a433ccb"></script>
 <script>
 (function(){
 "use strict";
@@ -573,21 +573,7 @@ function mapSVG(hl, opts={}){
 }
 
 /* ───────── 세계지도 · 지형 지도 · 기후 그래프 (직접 그림) ───────── */
-function worldSVG(iso){
-  const t = WPATH[iso]; const [x0,y0,x1,y1] = t.bb;
-  let w = Math.max((x1-x0)*2.6, 64), h = Math.max((y1-y0)*2.6, 50);
-  if(w < h*1.3) w = h*1.3; else h = w/1.3;
-  if(w > 1000){ w = 1000; h = 1000/1.3; }
-  const cx=(x0+x1)/2, cy=(y0+y1)/2;
-  let vx = Math.max(-500, Math.min(500-w, cx-w/2)), vy = Math.max(-260, Math.min(260-h, cy-h/2));
-  const sw = (w/300).toFixed(2);
-  let paths = "";
-  for(const p of WM.paths){ const b=p.bb; if(b[2] < vx-40 || b[0] > vx+w+40 || b[3] < vy-40 || b[1] > vy+h+40) continue;
-    paths += `<path d="${p.d}"${p.id===iso?' class="hl"':''}/>`; }
-  const small = (x1-x0) < w*0.05 && (y1-y0) < h*0.05;
-  const ring = small ? `<circle class="ring" cx="${t.c[0]}" cy="${t.c[1]}" r="${(w*0.045).toFixed(1)}" stroke-width="${(w/160).toFixed(2)}"/>` : "";
-  return `<svg class="wmap" viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" role="img" aria-label="세계 지도"><rect class="sea" x="${vx-10}" y="${vy-10}" width="${w+20}" height="${h+20}"/><g stroke-width="${sw}">${paths}</g>${ring}</svg>`;
-}
+/* worldSVG → 아래 gmap 으로 옮김 (위선·경선 격자 지도) */
 function landSVG(x){
   const xs=x.xy.map(p=>p[0]), ys=x.xy.map(p=>p[1]);
   const bx0=Math.min(...xs), bx1=Math.max(...xs), by0=Math.min(...ys), by1=Math.max(...ys);
@@ -674,7 +660,7 @@ function clueConflict(p, q){   // 단서가 다른 현 키워드에도 있으면
 
 /* ── 세계 자연지리 · 통계 ── */
 function wlKinds(x){
-  if(x.t==="위경도") return ["llRead","llPick"];
+  if(x.t==="위경도") return ["llRead","llPick","llName"];
   const k=[]; if(x.xy) k.push("wlMap","wlMap");
   if(x.t==="산맥"){ if(x.belt) k.push("wlBelt"); k.push("wlCont"); }
   else if(x.t==="고원·평원") k.push("wlCont");
@@ -723,57 +709,6 @@ const llLon = v => v===0 ? "경도 0°" : Math.abs(v)===180 ? "경도 180°" : `
 const llTxt = (la,lo) => `${llLat(la)} · ${llLon(lo)}`;
 const llTag = (v,ns) => v===0 ? "0°" : Math.abs(v)===180 ? "180°" : `${Math.abs(v)}°${ns? (v>0?"N":"S") : (v>0?"E":"W")}`;
 // 세계지도 path(Equal Earth 좌표)를 위경도로 되돌려 둠 → 위경도 문항은 경선이 수직인 직교 격자 지도로 그림
-let WLL_GEO = null;
-function llGeo(){
-  if(WLL_GEO) return WLL_GEO;
-  const A1=1.340264, A2=-0.081106, A3=0.000893, A4=0.003796, M=Math.sqrt(3)/2;
-  const inv = (X,Y)=>{ const y=-Y, xr=X;   // Newton으로 θ 찾기 (EE 좌표 그대로 사용)
-    const fy = t=>{ const t2=t*t, t6=t2*t2*t2; return t*(A1+A2*t2+t6*(A3+A4*t2)); };
-    const k = -EE(0,10)[1] / fy(Math.asin(M*Math.sin(10*Math.PI/180)));   // EE의 축척
-    let th = 0; for(let n=0;n<12;n++){ const t2=th*th, t6=t2*t2*t2; const f=k*th*(A1+A2*t2+t6*(A3+A4*t2))-y, d=k*(A1+3*A2*t2+t6*(7*A3+9*A4*t2)); th-=f/d; }
-    const t2=th*th, t6=t2*t2*t2;
-    const lat = Math.asin(Math.sin(th)/M)*180/Math.PI;
-    const lon = xr/k * 3*(9*A4*t6*t2+7*A3*t6+3*A2*t2+A1)/(2*Math.sqrt(3)*Math.cos(th)) *180/Math.PI;
-    return [lon, lat]; };
-  WLL_GEO = WM.paths.map(p=>{
-    const rings=[]; let b=[999,999,-999,-999];
-    for(const seg of p.d.split("M").filter(Boolean)){
-      const nums=(seg.replace(/z/g,"").match(/-?\d*\.?\d+/g)||[]).map(Number); if(nums.length<4) continue;
-      let X=nums[0], Y=nums[1]; const ring=[inv(X,Y)];
-      for(let q=2;q+1<nums.length;q+=2){ X+=nums[q]; Y+=nums[q+1]; ring.push(inv(X,Y)); }
-      ring.forEach(([lo,la])=>{ if(lo<b[0]) b[0]=lo; if(la<b[1]) b[1]=la; if(lo>b[2]) b[2]=lo; if(la>b[3]) b[3]=la; });
-      rings.push(ring);
-    }
-    return {rings, b};
-  });
-  return WLL_GEO;
-}
-function llSVG(x, pts){
-  const [s0,n0,w0,e0]=x.view, st=x.step, lat0=(s0+n0)/2, lon0=(w0+e0)/2, cs=Math.cos(lat0*Math.PI/180);
-  const P = (lo,la)=>[(lo-lon0)*cs, -la];      // 위도 1° = 1, 경도 1° = cos(중앙 위도)
-  let x0=(w0-lon0)*cs, x1=(e0-lon0)*cs, y0=-n0, y1=-s0, w=x1-x0, h=y1-y0;
-  if(w<h*1.3){ const d=h*1.3-w; x0-=d/2; w=h*1.3; } else { const d=w/1.3-h; y0-=d/2; h=w/1.3; }
-  const pad=w*0.0; const vx=x0-pad, vy=y0-pad, u=w/300;
-  const lonL=lon0+vx/cs, lonR=lon0+(vx+w)/cs, latT=-vy, latB=-(vy+h);
-  let paths="";
-  for(const g of llGeo()){ const b=g.b; if(b[2] < lonL-5 || b[0] > lonR+5 || b[3] < latB-5 || b[1] > latT+5) continue;
-    for(const r of g.rings){ const d=r.map((pt,k)=>{ const [X,Y]=P(pt[0],pt[1]); return (k?"L":"M")+X.toFixed(2)+" "+Y.toFixed(2); }).join("")+"Z"; paths+=`<path d="${d}"/>`; } }
-  let grid="", labs="";
-  const fs=w/24, fsLon=Math.max(w/48, Math.min(w/30, st*cs/4.0));   // 경선 간격이 좁으면 글자를 줄여서라도 모든 경선에 눈금
-  const lonEvery=Math.max(1, Math.ceil(fsLon*4.0/(st*cs))), latEvery=Math.max(1, Math.ceil(fs*1.6/st));
-  for(let la=Math.ceil(latB/st)*st; la<=latT; la+=st){
-    const yy=-la; grid+=`<line class="llg${la===0?" eq":""}" x1="${vx}" x2="${vx+w}" y1="${yy}" y2="${yy}"/>`;
-    if(Math.round(la/st)%latEvery===0 && yy>vy+h*0.06 && yy<vy+h*0.92) labs+=`<text class="lll" style="stroke-width:${(w/150).toFixed(2)}" x="${(vx+w*0.012).toFixed(2)}" y="${(yy-w*0.008).toFixed(2)}" font-size="${fs.toFixed(2)}">${llTag(la,true)}</text>`;
-  }
-  for(let lo=Math.ceil(lonL/st)*st; lo<=lonR; lo+=st){
-    const xx=(lo-lon0)*cs; grid+=`<line class="llg${lo===0?" eq":""}" x1="${xx}" x2="${xx}" y1="${vy}" y2="${vy+h}"/>`;
-    if(Math.round(lo/st)%lonEvery===0 && xx>vx+w*0.08 && xx<vx+w*0.95) labs+=`<text class="lll" style="stroke-width:${(w/150).toFixed(2)}" text-anchor="middle" x="${xx.toFixed(2)}" y="${(vy+h-w*0.012).toFixed(2)}" font-size="${fsLon.toFixed(2)}">${llTag(lo,false)}</text>`;
-  }
-  const dots = pts.map(q=>{ const [px,py]=P(q.lon,q.lat);
-    return `${q.ring?`<circle class="ring" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(9*u).toFixed(2)}" style="stroke-width:${(2*u).toFixed(2)}"/>`:""}<circle class="feat-pt" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(4.5*u).toFixed(2)}" style="stroke-width:${(1.3*u).toFixed(2)}"/>`
-      + (q.lab? `<g class="llab"><rect style="stroke-width:${(0.8*u).toFixed(2)}" x="${(px+6*u).toFixed(2)}" y="${(py-19*u).toFixed(2)}" width="${(17*u).toFixed(2)}" height="${(17*u).toFixed(2)}" rx="${(4*u).toFixed(2)}"/><text x="${(px+14.5*u).toFixed(2)}" y="${(py-6.3*u).toFixed(2)}" text-anchor="middle" font-size="${(12.5*u).toFixed(2)}">${q.lab}</text></g>` : ""); }).join("");
-  return `<svg class="wmap wfeat llmap" data-every="${lonEvery},${latEvery}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}" role="img" aria-label="위선·경선이 그려진 지도"><rect class="sea" x="${vx-1}" y="${vy-1}" width="${w+2}" height="${h+2}"/><g class="lland" style="stroke-width:${(w/320).toFixed(3)}">${paths}</g><g stroke-width="${(w/420).toFixed(3)}">${grid}</g>${labs}${dots}</svg>`;
-}
 function llNeighbors(x, r){   // 오답 후보: 한 칸씩 어긋난 교점 + 남북·동서 반구 바꾸기
   const st=x.step, c=[];
   const add=(la,lo)=>{ if(la<-85||la>85||lo<-180||lo>180) return; if(la===x.lat&&lo===x.lon) return; if(!c.some(p=>p[0]===la&&p[1]===lo)) c.push([la,lo]); };
@@ -782,26 +717,108 @@ function llNeighbors(x, r){   // 오답 후보: 한 칸씩 어긋난 교점 + �
   shuffle(flip, r).slice(0,1).forEach(p=>add(...p)); near.forEach(p=>add(...p));
   return c;
 }
-function wfeatSVG(x){
-  const pts=x.xy.flat(), xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
-  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
-  let w=Math.max((x1-x0)*1.7, 120), h=Math.max((y1-y0)*1.7, 90);
-  if(w < h*1.3) w = h*1.3; else h = w/1.3;
-  if(w > 1000){ w = 1000; h = 1000/1.3; }
-  const cx=(x0+x1)/2, cy=(y0+y1)/2;
-  const vx = Math.max(-500, Math.min(500-w, cx-w/2)), vy = Math.max(-260, Math.min(260-h, cy-h/2));
-  const u=w/300;
-  let paths=""; for(const p of WM.paths){ const b=p.bb; if(b[2] < vx-40 || b[0] > vx+w+40 || b[3] < vy-40 || b[1] > vy+h+40) continue; paths += `<path d="${p.d}"/>`; }
-  const arrow = x.t==="해류";
-  const feat = x.xy.map(l => l.length>1
-      ? `<polyline class="feat-line" points="${l.map(p=>p.join(",")).join(" ")}" stroke-width="${(3*u).toFixed(2)}"/>`
-      : `<circle class="ring" cx="${l[0][0]}" cy="${l[0][1]}" r="${(11*u).toFixed(1)}" stroke-width="${(2*u).toFixed(2)}"/><circle class="feat-pt" cx="${l[0][0]}" cy="${l[0][1]}" r="${(4.5*u).toFixed(1)}" stroke-width="${(1.3*u).toFixed(2)}"/>`).join("");
-  // 해류 화살촉: marker 대신 마지막 두 점 방향으로 삼각형을 직접 그림 (marker는 브라우저마다 표시가 달라서)
-  const heads = arrow ? x.xy.filter(l=>l.length>1).map(l=>{ const [ax,ay]=l[l.length-2], [bx,by]=l[l.length-1]; const a=Math.atan2(by-ay,bx-ax), L=16*u, W=8*u;
-      const p1=[bx+Math.cos(a)*L*0.4, by+Math.sin(a)*L*0.4], p2=[bx-Math.cos(a)*L*0.6+Math.cos(a+Math.PI/2)*W, by-Math.sin(a)*L*0.6+Math.sin(a+Math.PI/2)*W], p3=[bx-Math.cos(a)*L*0.6-Math.cos(a+Math.PI/2)*W, by-Math.sin(a)*L*0.6-Math.sin(a+Math.PI/2)*W];
-      return `<path class="feat-head" d="M${p1.map(v=>v.toFixed(1)).join(" ")}L${p2.map(v=>v.toFixed(1)).join(" ")}L${p3.map(v=>v.toFixed(1)).join(" ")}Z"/>`; }).join("") : "";
-  const defs = "";
-  return `<svg class="wmap wfeat" viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" role="img" aria-label="세계 지도">${defs}<rect class="sea" x="${vx-10}" y="${vy-10}" width="${w+20}" height="${h+20}"/><g stroke-width="${(w/300).toFixed(2)}">${paths}</g>${feat}${heads}</svg>`;
+// ── 위선·경선 격자 지도 (2026-10-06) ──
+// 세계지도 path는 Equal Earth 좌표라 위경도로 되돌린 뒤(invEE) 경선이 수직인 직교 격자(정거 원통, 경도 축척 cos(중앙 위도))로 다시 그림.
+// 나라 위치·수도·세계 지형·위경도 문항이 모두 이 지도를 씀 → 어떤 지도 문제든 위도·경도를 같이 읽을 수 있게.
+const invEE = (()=>{ const A1=1.340264, A2=-0.081106, A3=0.000893, A4=0.003796, M=Math.sqrt(3)/2;
+  const fy=t=>{ const t2=t*t, t6=t2*t2*t2; return t*(A1+A2*t2+t6*(A3+A4*t2)); };
+  const k = -EE(0,10)[1] / fy(Math.asin(M*Math.sin(10*Math.PI/180)));
+  return (X,Y)=>{ const y=-Y; let th=0;
+    for(let n=0;n<12;n++){ const t2=th*th, t6=t2*t2*t2; th -= (k*th*(A1+A2*t2+t6*(A3+A4*t2))-y)/(k*(A1+3*A2*t2+t6*(7*A3+9*A4*t2))); }
+    const t2=th*th, t6=t2*t2*t2;
+    return [X/k*3*(9*A4*t6*t2+7*A3*t6+3*A2*t2+A1)/(2*Math.sqrt(3)*Math.cos(th))*180/Math.PI, Math.asin(Math.sin(th)/M)*180/Math.PI]; }; })();
+let WGEO = null;
+function llGeo(){   // 나라별 위경도 링 + 경계 상자 (처음 한 번만 계산, 약 50ms)
+  if(WGEO) return WGEO;
+  WGEO = WM.paths.map(p=>{
+    const rings=[]; let b=[999,999,-999,-999], big=null, bigA=-1;
+    for(const seg of p.d.split("M").filter(Boolean)){
+      const nums=(seg.replace(/z/g,"").match(/-?\d*\.?\d+/g)||[]).map(Number); if(nums.length<4) continue;
+      let X=nums[0], Y=nums[1]; const ring=[invEE(X,Y)];
+      for(let q=2;q+1<nums.length;q+=2){ X+=nums[q]; Y+=nums[q+1]; ring.push(invEE(X,Y)); }
+      const rb=[999,999,-999,-999]; ring.forEach(([lo,la])=>{ rb[0]=Math.min(rb[0],lo); rb[1]=Math.min(rb[1],la); rb[2]=Math.max(rb[2],lo); rb[3]=Math.max(rb[3],la); });
+      b=[Math.min(b[0],rb[0]),Math.min(b[1],rb[1]),Math.max(b[2],rb[2]),Math.max(b[3],rb[3])];
+      const ar=(rb[2]-rb[0])*(rb[3]-rb[1]); if(ar>bigA){ bigA=ar; big=rb; }
+      rings.push(ring);
+    }
+    return {id:p.id, rings, b, big};
+  });
+  return WGEO;
+}
+const autoStep = span => [5,10,15,20,30,45].find(s=>span/s<=5) || 60;
+// o: {view:[남,북,서,동], step?, hl:iso, lines:[[[lon,lat]...]], arrows, pts:[{lat,lon,lab,ring}], small:[lon,lat]}
+function gmap(o){
+  let [s0,n0,w0,e0]=o.view;
+  s0=Math.max(-80,s0); n0=Math.min(84,n0); w0=Math.max(-180,w0); e0=Math.min(180,e0);
+  const lat0=(s0+n0)/2, lon0=(w0+e0)/2, cs=Math.max(0.2, Math.cos(lat0*Math.PI/180));
+  const st=o.step || autoStep(n0-s0);
+  const P=(lo,la)=>[(lo-lon0)*cs, -la];
+  let x0=(w0-lon0)*cs, y0=-n0, w=(e0-w0)*cs, h=n0-s0;
+  if(w<h*1.3){ x0-=(h*1.3-w)/2; w=h*1.3; } else { y0-=(w/1.3-h)/2; h=w/1.3; }
+  const vx=x0, vy=y0, u=w/300;
+  const lonL=lon0+vx/cs, lonR=lon0+(vx+w)/cs, latT=-vy, latB=-(vy+h);
+  let paths="";
+  for(const g of llGeo()){ const b=g.b; if(b[2] < lonL-2 || b[0] > lonR+2 || b[3] < latB-2 || b[1] > latT+2) continue;
+    let d=""; for(const r of g.rings){ d += r.map((pt,k)=>{ const [X,Y]=P(pt[0],pt[1]); return (k?"L":"M")+X.toFixed(2)+" "+Y.toFixed(2); }).join("")+"Z"; }
+    paths+=`<path d="${d}"${o.hl&&g.id===o.hl?' class="hl"':''}/>`; }
+  let grid="", labs="";
+  const fs=w/24;
+  // 경도 간격: 지정이 없으면 라벨(w/30 크기)이 겹치지 않는 가장 촘촘한 값
+  const stL = o.step || [5,10,15,20,30,45,60,90].find(z=>z*cs >= (w/30)*4.2 && (lonR-lonL)/z <= 9) || 90;
+  const fsLon=Math.max(w/48, Math.min(w/30, stL*cs/4.0));
+  const lonEvery=Math.max(1, Math.ceil(fsLon*4.0/(stL*cs))), latEvery=Math.max(1, Math.ceil(fs*1.6/st));
+  const sw=`style="stroke-width:${(w/150).toFixed(2)}"`;
+  for(let la=Math.ceil(latB/st)*st; la<=latT; la+=st){
+    const yy=-la; grid+=`<line class="llg${la===0?" eq":""}" x1="${vx}" x2="${vx+w}" y1="${yy}" y2="${yy}"/>`;
+    if(Math.round(la/st)%latEvery===0 && yy>vy+h*0.06 && yy<vy+h*0.92) labs+=`<text class="lll" ${sw} x="${(vx+w*0.012).toFixed(2)}" y="${(yy-w*0.008).toFixed(2)}" font-size="${fs.toFixed(2)}">${llTag(la,true)}</text>`;
+  }
+  const nlon = v => v>180 ? v-360 : v<-180 ? v+360 : v;   // 날짜변경선 너머 표기
+  for(let lo=Math.ceil(lonL/stL)*stL; lo<=lonR; lo+=stL){
+    const xx=(lo-lon0)*cs; grid+=`<line class="llg${lo===0?" eq":""}" x1="${xx}" x2="${xx}" y1="${vy}" y2="${vy+h}"/>`;
+    if(Math.round(lo/stL)%lonEvery===0 && xx>vx+w*0.08 && xx<vx+w*0.95) labs+=`<text class="lll" ${sw} text-anchor="middle" x="${xx.toFixed(2)}" y="${(vy+h-w*0.012).toFixed(2)}" font-size="${fsLon.toFixed(2)}">${llTag(nlon(lo),false)}</text>`;
+  }
+  let feat="";
+  (o.lines||[]).forEach(l=>{ const q=l.map(([lo,la])=>P(lo,la));
+    if(q.length>1){ feat+=`<polyline class="feat-line" points="${q.map(p=>p.map(v=>v.toFixed(2)).join(",")).join(" ")}" style="stroke-width:${(3*u).toFixed(2)}"/>`;
+      if(o.arrows){ const [ax,ay]=q[q.length-2], [bx,by]=q[q.length-1]; const a=Math.atan2(by-ay,bx-ax), L=16*u, W=8*u;
+        const p1=[bx+Math.cos(a)*L*0.4, by+Math.sin(a)*L*0.4], p2=[bx-Math.cos(a)*L*0.6+Math.cos(a+Math.PI/2)*W, by-Math.sin(a)*L*0.6+Math.sin(a+Math.PI/2)*W], p3=[bx-Math.cos(a)*L*0.6-Math.cos(a+Math.PI/2)*W, by-Math.sin(a)*L*0.6-Math.sin(a+Math.PI/2)*W];
+        feat+=`<path class="feat-head" style="stroke:none" d="M${p1.map(v=>v.toFixed(2)).join(" ")}L${p2.map(v=>v.toFixed(2)).join(" ")}L${p3.map(v=>v.toFixed(2)).join(" ")}Z"/>`; } }
+    else { const [px,py]=q[0]; feat+=`<circle class="ring" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(11*u).toFixed(2)}" style="stroke-width:${(2*u).toFixed(2)}"/><circle class="feat-pt" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(4.5*u).toFixed(2)}" style="stroke-width:${(1.3*u).toFixed(2)}"/>`; } });
+  if(o.small){ const [px,py]=P(...o.small); feat+=`<circle class="ring" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(w*0.045).toFixed(2)}" style="stroke-width:${(w/160).toFixed(2)}"/>`; }
+  (o.pts||[]).forEach(q=>{ const [px,py]=P(q.lon,q.lat);
+    feat += `${q.ring?`<circle class="ring" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(9*u).toFixed(2)}" style="stroke-width:${(2*u).toFixed(2)}"/>`:""}<circle class="feat-pt" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(4.5*u).toFixed(2)}" style="stroke-width:${(1.3*u).toFixed(2)}"/>`
+      + (q.lab? `<g class="llab"><rect style="stroke-width:${(0.8*u).toFixed(2)}" x="${(px+6*u).toFixed(2)}" y="${(py-19*u).toFixed(2)}" width="${(17*u).toFixed(2)}" height="${(17*u).toFixed(2)}" rx="${(4*u).toFixed(2)}"/><text x="${(px+14.5*u).toFixed(2)}" y="${(py-6.3*u).toFixed(2)}" text-anchor="middle" font-size="${(12.5*u).toFixed(2)}">${q.lab}</text></g>` : ""); });
+  return `<svg class="wmap wfeat llmap" data-every="${lonEvery},${latEvery}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}" role="img" aria-label="위선·경선이 그려진 세계 지도"><rect class="sea" x="${vx-1}" y="${vy-1}" width="${w+2}" height="${h+2}"/><g class="lland" style="stroke-width:${(w/320).toFixed(3)}">${paths}</g><g style="stroke-width:${(w/420).toFixed(3)}">${grid}</g>${feat}${labs}</svg>`;   // 눈금 글자는 맨 위
+}
+const llSVG = (x, pts) => gmap({view:x.view, step:x.step, pts});
+// 위경도를 묻는 개념(기출) 문항 — 답한 뒤 격자 지도로 확인 (글로도·지도로도 알도록)
+const CMAP = {
+  "2018-1-Q21": {view:[50,72,0,45], hl:"246"},                                                        // 핀란드: 북위·동경
+  "2019-2-Q20": {view:[30,48,125,150], step:5, pts:[{lat:43.06, lon:141.35, ring:true}]},              // 삿포로 북위 약 43°
+  "2021-2-Q20": {view:[10,35,30,65], step:5, lines:[[[45,10],[45,35]],[[30,25],[65,25]]]},             // 동경 45°·북위 25° → 아라비아 반도
+  "2023-2-Q03": {view:[50,70,0,30], step:10, pts:[{lat:59.33, lon:18.07, ring:true}]},                 // 스톡홀름 북위 약 60°
+  "2024-1-Q20": {view:[-40,40,-25,60], step:10, hl:"450"},                                             // 본초 자오선 동쪽·적도 남쪽 → 마다가스카르
+  "2024-2-Q01": {view:[40,60,-10,25], step:5, hl:"056", lines:[[[-10,50],[25,50]]]},                    // 북위 50°선 → 벨기에
+  "2025-1-Q06": {view:[25,50,-135,-105], step:5, pts:[{lat:37.77, lon:-122.42, ring:true}]},           // 샌프란시스코 서경 약 122°·북위 약 38°
+  "2017-2-Q20": {view:[30,42,128,146], step:5, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},   // 동경 135° → 아카시
+  "2025-2-Q21": {view:[30,42,128,146], step:5, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},
+  "2024-1-Q22": {view:[30,42,128,146], step:5, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},
+  "2021-2-Q22": {view:[25,62,-90,15], step:15, pts:[{lat:51.5, lon:0, ring:true},{lat:40.7, lon:-74.0, ring:true}]},   // 런던(0°)·뉴욕(서경 75° 표준시)
+};
+function worldSVG(iso){   // 나라 위치·수도: 그 나라를 빨갛게 + 주변 + 격자
+  const g = llGeo().find(z=>z.id===iso); if(!g) return "";
+  const [lo0,la0,lo1,la1]=g.big, cx=(lo0+lo1)/2, cy=(la0+la1)/2;
+  const half=Math.max((lo1-lo0)*1.3, (la1-la0)*1.3*1.3, 14);
+  const hw=half, hh=half/1.3;
+  const small = (lo1-lo0) < 3 && (la1-la0) < 3;
+  return gmap({view:[cy-hh, cy+hh, cx-hw, cx+hw], hl:iso, small: small? [cx,cy] : null});
+}
+function wfeatSVG(x){   // 세계 지형: 산맥·하천·해류 선 / 점 + 격자
+  const lines = x.xy.map(l=>l.map(([X,Y])=>invEE(X,Y)));
+  const pts=lines.flat(), los=pts.map(p=>p[0]), las=pts.map(p=>p[1]);
+  const lo0=Math.min(...los), lo1=Math.max(...los), la0=Math.min(...las), la1=Math.max(...las);
+  const cx=(lo0+lo1)/2, cy=(la0+la1)/2, half=Math.max((lo1-lo0)*0.85, (la1-la0)*0.85*1.3, 14), hh=half/1.3;
+  return gmap({view:[cy-hh, cy+hh, cx-half, cx+half], lines, arrows:x.t==="해류"});
 }
 const WS_ALL = () => [...new Set(WSTAT.flatMap(x=>x.ranks||[]))];
 function wsOutsiders(x, r, n){
@@ -886,6 +903,14 @@ const BUILD = {
     return {choices:opts.map(([la,lo])=>({main:llTxt(la,lo)})), answer:opts.findIndex(p=>p[0]===x.lat&&p[1]===x.lon), tag:"위도·경도",
       prompt:`지도의 <span style="color:var(--map-hl)">빨간 점</span>은 <b>${esc(x.ko)}</b>에 있어요. 이 점의 위도·경도는?`, svg:llSVG(x,[{lat:x.lat,lon:x.lon,ring:true}]),
       explain:`<b>${esc(x.ko)}</b> — ${esc(llTxt(x.lat,x.lon))}<br><span class="muted">${esc(x.note)}</span>`};
+  },
+  llName(x, r){   // 지도 없이 글로: 위경도 → 어디? (답한 뒤 지도)
+    const same = shuffle(WLL.filter(y=>y!==x && (y.lat===x.lat || y.lon===x.lon)), r);   // 같은 위도·같은 경도인 곳을 먼저 오답으로
+    const rest = shuffle(WLL.filter(y=>y!==x && !same.includes(y)), r);
+    const w=[...same, ...rest].slice(0,3);
+    const k = mk(x, w, r, y=>({main:y.ko}));
+    return {...k, tag:"위도·경도", prompt:`<span class="big">${esc(llTxt(x.lat,x.lon))}</span>이 위치에 있는 반도·섬·지역은?`, svgAfter:llSVG(x,[{lat:x.lat,lon:x.lon,ring:true}]),
+      explain:`<b>${esc(x.ko)}</b> — ${esc(llTxt(x.lat,x.lon))}<br><span class="muted">${esc(x.note)}</span><br><span class="muted">${w.map(y=>`${esc(y.ko)}: ${esc(llTxt(y.lat,y.lon))}`).join(" / ")}</span>`};
   },
   llPick(x, r){   // 위경도를 보고 A~D 중 고르기
     const [s0,n0,w0,e0]=x.view, st=x.step, inner=[];
@@ -1065,7 +1090,8 @@ const BUILD = {
   concept(x, r){
     const idx = [0,1,2,3]; const ord = shuffle(idx, r);
     const choices = ord.map(i=>({main:x.c[i]}));
-    return {tag:x.subj+" · 개념", prompt:`<span class="qtext">${esc(x.q)}</span>`, choices, answer: ord.indexOf(x.a),
+    const cm = CMAP[x.src];
+    return {tag:x.subj+" · 개념", prompt:`<span class="qtext">${esc(x.q)}</span>`, choices, answer: ord.indexOf(x.a), svgAfter: cm? gmap(cm) : null,
       explain:`${esc(x.e)}<br><span class="muted">키워드: ${x.kw.map(esc).join(" · ")}</span>`};
   }
 };
