@@ -411,7 +411,7 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 <main id="app" aria-live="polite"></main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="data.js?v=3a433ccb"></script>
+<script src="data.js?v=a9762625"></script>
 <script>
 (function(){
 "use strict";
@@ -745,7 +745,7 @@ function llGeo(){   // 나라별 위경도 링 + 경계 상자 (처음 한 번�
   });
   return WGEO;
 }
-const autoStep = span => [5,10,15,20,30,45].find(s=>span/s<=5) || 60;
+const autoStep = span => [15,30,45].find(s=>span/s<=5) || 90;   // 학생은 15° 간격만 알면 됨 → 격자는 15°의 배수만
 // o: {view:[남,북,서,동], step?, hl:iso, lines:[[[lon,lat]...]], arrows, pts:[{lat,lon,lab,ring}], small:[lon,lat]}
 function gmap(o){
   let [s0,n0,w0,e0]=o.view;
@@ -764,7 +764,7 @@ function gmap(o){
   let grid="", labs="";
   const fs=w/24;
   // 경도 간격: 지정이 없으면 라벨(w/30 크기)이 겹치지 않는 가장 촘촘한 값
-  const stL = o.step || [5,10,15,20,30,45,60,90].find(z=>z*cs >= (w/30)*4.2 && (lonR-lonL)/z <= 9) || 90;
+  const stL = o.step || [15,30,45,90].find(z=>z*cs >= (w/30)*4.2 && (lonR-lonL)/z <= 9) || 90;
   const fsLon=Math.max(w/48, Math.min(w/30, stL*cs/4.0));
   const lonEvery=Math.max(1, Math.ceil(fsLon*4.0/(stL*cs))), latEvery=Math.max(1, Math.ceil(fs*1.6/st));
   const sw=`style="stroke-width:${(w/150).toFixed(2)}"`;
@@ -794,15 +794,15 @@ const llSVG = (x, pts, bare) => gmap({view:x.view, step:x.step, pts, bare});   /
 // 위경도를 묻는 개념(기출) 문항 — 답한 뒤 격자 지도로 확인 (글로도·지도로도 알도록)
 const CMAP = {
   "2018-1-Q21": {view:[50,72,0,45], hl:"246"},                                                        // 핀란드: 북위·동경
-  "2019-2-Q20": {view:[30,48,125,150], step:5, pts:[{lat:43.06, lon:141.35, ring:true}]},              // 삿포로 북위 약 43°
-  "2021-2-Q20": {view:[10,35,30,65], step:5, lines:[[[45,10],[45,35]],[[30,25],[65,25]]]},             // 동경 45°·북위 25° → 아라비아 반도
-  "2023-2-Q03": {view:[50,70,0,30], step:10, pts:[{lat:59.33, lon:18.07, ring:true}]},                 // 스톡홀름 북위 약 60°
-  "2024-1-Q20": {view:[-40,40,-25,60], step:10, hl:"450"},                                             // 본초 자오선 동쪽·적도 남쪽 → 마다가스카르
-  "2024-2-Q01": {view:[40,60,-10,25], step:5, hl:"056", lines:[[[-10,50],[25,50]]]},                    // 북위 50°선 → 벨기에
-  "2025-1-Q06": {view:[25,50,-135,-105], step:5, pts:[{lat:37.77, lon:-122.42, ring:true}]},           // 샌프란시스코 서경 약 122°·북위 약 38°
-  "2017-2-Q20": {view:[30,42,128,146], step:5, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},   // 동경 135° → 아카시
-  "2025-2-Q21": {view:[30,42,128,146], step:5, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},
-  "2024-1-Q22": {view:[30,42,128,146], step:5, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},
+  "2019-2-Q20": {view:[30,48,125,150], step:15, pts:[{lat:43.06, lon:141.35, ring:true}]},              // 삿포로 북위 약 43°
+  "2021-2-Q20": {view:[10,35,30,65], step:15, lines:[[[45,10],[45,35]],[[30,25],[65,25]]]},             // 동경 45°·북위 25° → 아라비아 반도
+  "2023-2-Q03": {view:[50,70,0,30], step:15, pts:[{lat:59.33, lon:18.07, ring:true}]},                 // 스톡홀름 북위 약 60°
+  "2024-1-Q20": {view:[-40,40,-25,60], step:15, hl:"450"},                                             // 본초 자오선 동쪽·적도 남쪽 → 마다가스카르
+  "2024-2-Q01": {view:[40,60,-10,25], step:15, hl:"056", lines:[[[-10,50],[25,50]]]},                    // 북위 50°선 → 벨기에
+  "2025-1-Q06": {view:[25,50,-135,-105], step:15, pts:[{lat:37.77, lon:-122.42, ring:true}]},           // 샌프란시스코 서경 약 122°·북위 약 38°
+  "2017-2-Q20": {view:[27,47,122,150], step:15, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},   // 동경 135° → 아카시
+  "2025-2-Q21": {view:[27,47,122,150], step:15, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},
+  "2024-1-Q22": {view:[27,47,122,150], step:15, lines:[[[135,30],[135,42]]], pts:[{lat:34.65, lon:135.0}]},
   "2021-2-Q22": {view:[25,62,-90,15], step:15, pts:[{lat:51.5, lon:0, ring:true},{lat:40.7, lon:-74.0, ring:true}]},   // 런던(0°)·뉴욕(서경 75° 표준시)
 };
 function worldSVG(iso){   // 나라 위치·수도: 그 나라를 빨갛게 + 주변 + 격자
