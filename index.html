@@ -517,7 +517,21 @@ if(!CONFIG.worldChrono){   // 세계 연표: 준비 중 — 범위 선택에서 
   SETS.filter(x=>x.composite).forEach(c=>{ c.composite=c.composite.filter(p=>p.label!=="세계 연표");
     const t=c.composite.reduce((a,p)=>a+p.share,0); c.composite.forEach(p=>p.share=p.share/t); });
 }
-const setById = id => SETS.find(s=>s.id===id) || SETS[0];
+// 맞춤 범위 (2026-10-06): 강사가 여러 범위를 고르면 id를 쉼표로 이어 붙임 (예: "g-country,c-soc") → 같은 비율로 섞는 통합 세트를 그때그때 만든다
+const CUSTOM = {};
+function customSet(ids){
+  const subs = SETS.filter(x=>ids.includes(x.id) && !x.soon);   // 순서는 목록 순서로 고정 (암호·기록이 같은 세트로 묶이게)
+  if(subs.length<=1) return subs[0] || SETS[0];
+  const key = subs.map(x=>x.id).join(",");
+  if(CUSTOM[key]) return CUSTOM[key];
+  const k = subs.length, parts = [];
+  subs.forEach(x=>{ if(x.composite) x.composite.forEach(pt=>parts.push({...pt, share:pt.share/k}));
+                    else parts.push({label:x.group, chip:mname(x), share:1/k, sets:[x.id]}); });
+  const subj = subs.every(x=>x.subj===subs[0].subj) ? subs[0].subj : "all";
+  return CUSTOM[key] = {id:key, group:"맞춤", subj, custom:true, name:subs.map(x=>x.composite? x.name : mname(x)).join(" + "),
+    full:subs.map(x=>setLabel(x)).join(" + "), composite:parts, pool:()=>subs.flatMap(x=>x.pool())};
+}
+const setById = id => String(id||"").includes(",") ? customSet(String(id).split(",")) : (SETS.find(s=>s.id===id) || SETS[0]);
 // 범위 목록 묶음 (화면 표시용). group 은 영역(분석·출제 비율용) 그대로 둠
 const MENU = [
   {menu:"통합본", ids:["all"]},
@@ -534,10 +548,10 @@ const SUR1 = "김이박최정강조윤장임한오서신권황안송류유전홍
       SUR2 = ["남궁","황보","제갈","선우","독고","사공","서문","동방"];
 const okName = v => { v = String(v||""); if(!/^[가-힣]{2,5}$/.test(v)) return false; return SUR2.some(x=>v.startsWith(x) && v.length>=3) || SUR1.includes(v[0]); };
 const nameMsg = v => !v ? "이름을 먼저 입력하세요" : /\s/.test(v) ? "띄어쓰기 없이 써 주세요 (예: 김하늘)" : !/^[가-힣]+$/.test(v) ? "한글로 써 주세요 (예: 김하늘)" : "성과 이름을 정확히 써 주세요 (예: 김하늘)";
-const okSet = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon ? id : "all"; };
+const okSet = id => { const ok = String(id||"").split(",").filter(x=>{ const s=SETS.find(y=>y.id===x); return s && !s.soon; }); return ok.length? ok.join(",") : "all"; };
 const PRAC_SETS = () => SETS.filter(x=>!x.soon && !x.teacherOnly);   // 학생 혼자 연습 목록
 const okPrac = id => { const s=SETS.find(x=>x.id===id); return s && !s.soon && !s.teacherOnly ? id : PRAC_SETS()[0].id; };
-const setLabel = s => s.composite ? (s.id==="all" ? "통합본" : "통합본 · "+s.name) : s.group+" · "+s.name;
+const setLabel = s => s.custom ? "맞춤 · "+s.full : s.composite ? (s.id==="all" ? "통합본" : "통합본 · "+s.name) : s.group+" · "+s.name;
 
 /* ───────── 지도 ───────── */
 const M = D.jpmap;
@@ -1064,7 +1078,7 @@ function renderEntry(){
       <span class="eyebrow">오늘의 퇴실 퀴즈 · ${korDateShort()}</span>
       <h1>${esc(set.name)}</h1>
       <div class="meta"><span><b>${preset.n}</b>문항</span><span>한 번에 다 맞혀야 퇴실</span><span>틀리면 처음부터</span></div>
-      <div class="chips">${clsFixed()? `<span class="clschip">${esc(preset.c)}</span>` : ""}${set.composite? set.composite.map(c=>`<span>${esc(c.label)}</span>`).join("") : `<span>${esc(set.group)}</span>`}</div>
+      <div class="chips">${clsFixed()? `<span class="clschip">${esc(preset.c)}</span>` : ""}${set.composite? set.composite.map(c=>`<span>${esc(c.chip||c.label)}</span>`).join("") : `<span>${esc(set.group)}</span>`}</div>
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       ${clsFixed()? "" : `<div class="field"><span class="lbl">반</span>
@@ -1306,7 +1320,7 @@ function renderTicket(){
       <div class="t-head"><span class="kind">帰宅券</span><span>No. ${String(hashStr(S.name+S.startAt)%100000).padStart(5,"0")}</span></div>
       <div class="band" style="--c:${SUBJ[S.set.subj][1]}">
         <span class="band-date">${korDate(new Date(S.endAt))}</span>
-        <span class="band-test">${esc(S.set.composite? "통합본 테스트" : S.set.group+" · "+S.set.name)}</span>
+        <span class="band-test">${esc(S.set.custom? S.set.name : S.set.composite? "통합본 테스트" : S.set.group+" · "+S.set.name)}</span>
         <span class="band-mix">${esc(mixLine())}</span>
       </div>
       <div class="route"><div class="stn"><b>教室</b><span>교실</span></div><div class="arrow"></div><div class="stn"><b>自宅</b><span>집</span></div></div>
@@ -1507,6 +1521,7 @@ let rankTimer=null;
 
 /* ───────── 강사 화면 ───────── */
 let tstate = {cls:preset.c || Object.keys(CONFIG.classes)[0], set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem("kitaku.ttab")||"set"; }catch(e){ return "set"; } })()};
+const tSel = () => String(tstate.set||"all").split(",");
 function studentURL(){
   const onPages = /github\.io$/.test(location.hostname);
   const base = onPages ? location.origin+location.pathname : CONFIG.plannedBase;
@@ -1519,7 +1534,7 @@ function renderTeacher(){
   const setlist = menuList(x=>!x.soon || x.id==="w-pol").map(({menu:g, sets:ss})=>
     `<div class="setgroup"><h3 style="--c:${MC[g]||"var(--go)"}">${esc(g)}</h3>${ss.map(s=>{
       const cnt = s.soon? s.soon : s.pool().length+"개";
-      return `<label class="setopt${s.soon?" off":""}${s.teacherOnly?" tonly":""}"><input type="radio" name="set" value="${s.id}" ${s.id===tstate.set?"checked":""} ${s.soon?"disabled":""}><span class="nm">${esc(s.soon && s.group==="세계 연표" ? "세계 연표" : mname(s))}${s.teacherOnly?` <em class="tchip">강사용</em>`:""}</span><span class="ct">${esc(cnt)}</span></label>`; }).join("")}</div>`).join("");
+      return `<label class="setopt${s.soon?" off":""}${s.teacherOnly?" tonly":""}"><input type="checkbox" name="set" value="${s.id}" ${tSel().includes(s.id)?"checked":""} ${s.soon?"disabled":""}><span class="nm">${esc(s.soon && s.group==="세계 연표" ? "세계 연표" : mname(s))}${s.teacherOnly?` <em class="tchip">강사용</em>`:""}</span><span class="ct">${esc(cnt)}</span></label>`; }).join("")}</div>`).join("");
   const log=store.get("log", []).filter(r=>r.date===today()).reverse();
   const tally={}; log.forEach(r=>r.wrong.forEach(w=>{ tally[w.id]=tally[w.id]||{name:w.name,c:0}; tally[w.id].c++; }));
   const worst=Object.values(tally).sort((a,b)=>b.c-a.c).slice(0,5);
@@ -1531,7 +1546,7 @@ function renderTeacher(){
       <section class="card" style="display:flex;flex-direction:column;gap:14px">
         <div class="field"><span class="lbl">반</span><div class="seg" role="group" aria-label="반">${Object.keys(CONFIG.classes).map(c=>`<button data-tcls="${esc(c)}" aria-pressed="${c===tstate.cls}">${clsBtn(c)}</button>`).join("")}</div></div>
         <div class="field"><span class="lbl">문항 수</span><div class="seg" role="group" aria-label="문항 수">${[10,15,20,30].map(n=>`<button data-tn="${n}" aria-pressed="${n===tstate.n}">${n}문항</button>`).join("")}</div></div>
-        <div class="field"><span class="lbl">범위</span><div class="setlist">${setlist}</div></div>
+        <div class="field"><span class="lbl">범위 <span class="muted" style="font-weight:500">· 여러 개 고르면 같은 비율로 섞여요</span></span><div class="setlist">${setlist}</div></div>
       </section>
       <div style="display:flex;flex-direction:column;gap:14px">
         <section class="card qrpane">
@@ -1558,7 +1573,11 @@ function bindTeacher(){
   if(tstate.tab==="an"){ bindAnalysis(); return; }
   document.querySelectorAll("[data-tcls]").forEach(b=>b.onclick=()=>{ tstate.cls=b.dataset.tcls; render(); });
   document.querySelectorAll("[data-tn]").forEach(b=>b.onclick=()=>{ tstate.n=+b.dataset.tn; render(); });
-  document.querySelectorAll('input[name="set"]').forEach(x=>x.onchange=()=>{ tstate.set=x.value; render(); });
+  document.querySelectorAll('input[name="set"]').forEach(x=>x.onchange=()=>{
+    let sel = tSel().filter(id=>id!==x.value); if(x.checked) sel.push(x.value);
+    if(!sel.length){ x.checked=true; return; }                                   // 최소 하나는 남김
+    const order = SETS.map(s=>s.id); sel.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+    tstate.set = sel.join(","); render(); });
   $("#clear-local").onclick=()=>{ if(!confirm("이 기기에 저장된 풀이 기록(오늘 퇴실 기록·지난 점수)을 모두 지울까요? 시트 기록은 그대로예요.")) return;
     try{ Object.keys(localStorage).filter(k=>/^kitaku\.(log|mylog|hist\.|phist\.)/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){} render(); };
   $("#preview").onclick=()=>{ preset={...tstate, date:today()}; store.set("preset2", preset); mode="class"; entry={cls:tstate.cls, name:null}; S=null; go("entry"); };
@@ -1582,6 +1601,7 @@ const AN_LABEL = (()=>{ const m={}; SETS.forEach(s=>{ m[setLabel(s)]=s; }); retu
 function anSet(label){
   let l=String(label||"").replace(/^연습 · /,"").trim().replace(/^개념\(기출\)/,"개념").replace("도도부현 위치","토도부현").replace("도도부현","토도부현").replace("통합본 · 일본 (지리+연표)","통합본 · 일본 전체 통합").replace("통합본 · 세계 지리","통합본 · 세계 전체 통합").replace("통합본 · 개념","개념 · 전 과목").replace("자연지리(지형)","세계 지형").replace("기후 그래프(쾨펜)","기후 그래프");
   if(AN_LABEL[l]) return AN_LABEL[l];
+  if(/^맞춤 · /.test(l)){ const ids=l.slice(5).split(" + ").map(x=>AN_LABEL[x.trim()]).filter(Boolean).map(x=>x.id); if(ids.length) return setById(ids.join(",")); }
   if(/일본 지리 · 지형/.test(l)) return setById("jp-land");
   return null;
 }
