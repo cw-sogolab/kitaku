@@ -153,7 +153,8 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .jzoom .feat-pt{fill:var(--map-hl);stroke:var(--paper);}
 .wfeat .feat-line{fill:none;stroke:var(--map-hl);stroke-linecap:round;stroke-linejoin:round}
 .wfeat .feat-pt{fill:var(--map-hl);stroke:var(--paper)}
-.llmap .llg{fill:none;stroke:var(--muted);stroke-opacity:.55;stroke-dasharray:3 2}
+.mapbox .llmap .lland path{stroke-width:inherit}
+.llmap .llg{fill:none;stroke:var(--muted);stroke-opacity:.45}
 .llmap .llg.eq{stroke:var(--go);stroke-opacity:.9;stroke-dasharray:none}
 .llmap .lll{fill:var(--ink);font-weight:700;font-family:var(--f-mono);paint-order:stroke;stroke:var(--sea)}
 .llmap .llab rect{fill:var(--paper);stroke:var(--ink)}
@@ -721,40 +722,57 @@ const llLat = v => v===0 ? "적도(0°)" : `${v>0?"북위":"남위"} ${Math.abs(
 const llLon = v => v===0 ? "경도 0°" : Math.abs(v)===180 ? "경도 180°" : `${v>0?"동경":"서경"} ${Math.abs(v)}°`;
 const llTxt = (la,lo) => `${llLat(la)} · ${llLon(lo)}`;
 const llTag = (v,ns) => v===0 ? "0°" : Math.abs(v)===180 ? "180°" : `${Math.abs(v)}°${ns? (v>0?"N":"S") : (v>0?"E":"W")}`;
+// 세계지도 path(Equal Earth 좌표)를 위경도로 되돌려 둠 → 위경도 문항은 경선이 수직인 직교 격자 지도로 그림
+let WLL_GEO = null;
+function llGeo(){
+  if(WLL_GEO) return WLL_GEO;
+  const A1=1.340264, A2=-0.081106, A3=0.000893, A4=0.003796, M=Math.sqrt(3)/2;
+  const inv = (X,Y)=>{ const y=-Y, xr=X;   // Newton으로 θ 찾기 (EE 좌표 그대로 사용)
+    const fy = t=>{ const t2=t*t, t6=t2*t2*t2; return t*(A1+A2*t2+t6*(A3+A4*t2)); };
+    const k = -EE(0,10)[1] / fy(Math.asin(M*Math.sin(10*Math.PI/180)));   // EE의 축척
+    let th = 0; for(let n=0;n<12;n++){ const t2=th*th, t6=t2*t2*t2; const f=k*th*(A1+A2*t2+t6*(A3+A4*t2))-y, d=k*(A1+3*A2*t2+t6*(7*A3+9*A4*t2)); th-=f/d; }
+    const t2=th*th, t6=t2*t2*t2;
+    const lat = Math.asin(Math.sin(th)/M)*180/Math.PI;
+    const lon = xr/k * 3*(9*A4*t6*t2+7*A3*t6+3*A2*t2+A1)/(2*Math.sqrt(3)*Math.cos(th)) *180/Math.PI;
+    return [lon, lat]; };
+  WLL_GEO = WM.paths.map(p=>{
+    const rings=[]; let b=[999,999,-999,-999];
+    for(const seg of p.d.split("M").filter(Boolean)){
+      const nums=(seg.replace(/z/g,"").match(/-?\d*\.?\d+/g)||[]).map(Number); if(nums.length<4) continue;
+      let X=nums[0], Y=nums[1]; const ring=[inv(X,Y)];
+      for(let q=2;q+1<nums.length;q+=2){ X+=nums[q]; Y+=nums[q+1]; ring.push(inv(X,Y)); }
+      ring.forEach(([lo,la])=>{ if(lo<b[0]) b[0]=lo; if(la<b[1]) b[1]=la; if(lo>b[2]) b[2]=lo; if(la>b[3]) b[3]=la; });
+      rings.push(ring);
+    }
+    return {rings, b};
+  });
+  return WLL_GEO;
+}
 function llSVG(x, pts){
-  const [s0,n0,w0,e0]=x.view, st=x.step;
-  const edge=[]; for(let la=s0; la<=n0; la+=1){ edge.push(EE(w0,la), EE(e0,la)); } for(let lo=w0; lo<=e0; lo+=1){ edge.push(EE(lo,s0), EE(lo,n0)); }
-  const xs=edge.map(p=>p[0]), ys=edge.map(p=>p[1]);
-  let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
-  let w=x1-x0, h=y1-y0; if(w<h*1.3){ const d=h*1.3-w; x0-=d/2; w=h*1.3; } else { const d=w/1.3-h; y0-=d/2; h=w/1.3; }
-  const vx=x0, vy=y0, u=w/300;
-  let paths=""; for(const p of WM.paths){ const b=p.bb; if(b[2] < vx-40 || b[0] > vx+w+40 || b[3] < vy-40 || b[1] > vy+h+40) continue; paths += `<path d="${p.d}"/>`; }
-  // 보이는 범위의 위도 (아래·위 끝)
-  const yAt = la => EE(0,la)[1];
-  const latOfY = y => { let a=-89, b=89; for(let i=0;i<40;i++){ const m=(a+b)/2; if(yAt(m) > y) a=m; else b=m; } return (a+b)/2; };
-  const latB=latOfY(vy+h), latT=latOfY(vy);
-  const midLon=(w0+e0)/2;
-  const lonOfX = (xx, la) => { let a=-180, b=180; for(let i=0;i<40;i++){ const m=(a+b)/2; if(EE(m,la)[0] < xx) a=m; else b=m; } return (a+b)/2; };
-  const lonL=Math.min(lonOfX(vx,latB), lonOfX(vx,latT)), lonR=Math.max(lonOfX(vx+w,latB), lonOfX(vx+w,latT));
+  const [s0,n0,w0,e0]=x.view, st=x.step, lat0=(s0+n0)/2, lon0=(w0+e0)/2, cs=Math.cos(lat0*Math.PI/180);
+  const P = (lo,la)=>[(lo-lon0)*cs, -la];      // 위도 1° = 1, 경도 1° = cos(중앙 위도)
+  let x0=(w0-lon0)*cs, x1=(e0-lon0)*cs, y0=-n0, y1=-s0, w=x1-x0, h=y1-y0;
+  if(w<h*1.3){ const d=h*1.3-w; x0-=d/2; w=h*1.3; } else { const d=w/1.3-h; y0-=d/2; h=w/1.3; }
+  const pad=w*0.0; const vx=x0-pad, vy=y0-pad, u=w/300;
+  const lonL=lon0+vx/cs, lonR=lon0+(vx+w)/cs, latT=-vy, latB=-(vy+h);
+  let paths="";
+  for(const g of llGeo()){ const b=g.b; if(b[2] < lonL-5 || b[0] > lonR+5 || b[3] < latB-5 || b[1] > latT+5) continue;
+    for(const r of g.rings){ const d=r.map((pt,k)=>{ const [X,Y]=P(pt[0],pt[1]); return (k?"L":"M")+X.toFixed(2)+" "+Y.toFixed(2); }).join("")+"Z"; paths+=`<path d="${d}"/>`; } }
   let grid="", labs="";
-  const fs=(w/24).toFixed(1);
-  // 라벨이 겹치지 않게: 경선 간격이 라벨 폭보다 좁으면 몇 칸 걸러 표시
-  const midLat=(latB+latT)/2, gap=Math.abs(EE(midLon+st,midLat)[0]-EE(midLon,midLat)[0]);
-  const fsLon=w/30, lonEvery = Math.max(1, Math.ceil(fsLon*4.0/gap)), latGap=Math.abs(yAt(midLat+st)-yAt(midLat)), latEvery=Math.max(1, Math.ceil((w/24)*1.6/latGap));
+  const fs=w/24, fsLon=Math.max(w/48, Math.min(w/30, st*cs/4.0));   // 경선 간격이 좁으면 글자를 줄여서라도 모든 경선에 눈금
+  const lonEvery=Math.max(1, Math.ceil(fsLon*4.0/(st*cs))), latEvery=Math.max(1, Math.ceil(fs*1.6/st));
   for(let la=Math.ceil(latB/st)*st; la<=latT; la+=st){
-    const pts2=[]; for(let lo=Math.floor(lonL); lo<=Math.ceil(lonR); lo+=1) pts2.push(EE(lo,la).map(v=>v.toFixed(1)).join(","));
-    grid+=`<polyline class="llg${la===0?" eq":""}" points="${pts2.join(" ")}"/>`;
-    const yy=EE(midLon,la)[1]; if(Math.round(la/st)%latEvery===0 && yy>vy+h*0.06 && yy<vy+h*0.94) labs+=`<text class="lll" stroke-width="${(w/150).toFixed(2)}" x="${(vx+w*0.012).toFixed(1)}" y="${(yy-w*0.008).toFixed(1)}" font-size="${fs}">${llTag(la,true)}</text>`;
+    const yy=-la; grid+=`<line class="llg${la===0?" eq":""}" x1="${vx}" x2="${vx+w}" y1="${yy}" y2="${yy}"/>`;
+    if(Math.round(la/st)%latEvery===0 && yy>vy+h*0.06 && yy<vy+h*0.92) labs+=`<text class="lll" style="stroke-width:${(w/150).toFixed(2)}" x="${(vx+w*0.012).toFixed(2)}" y="${(yy-w*0.008).toFixed(2)}" font-size="${fs.toFixed(2)}">${llTag(la,true)}</text>`;
   }
   for(let lo=Math.ceil(lonL/st)*st; lo<=lonR; lo+=st){
-    const pts2=[]; for(let la=Math.floor(latB)-1; la<=Math.ceil(latT)+1; la+=1) pts2.push(EE(lo,la).map(v=>v.toFixed(1)).join(","));
-    grid+=`<polyline class="llg${lo===0?" eq":""}" points="${pts2.join(" ")}"/>`;
-    const bx=EE(lo, latB+ (latT-latB)*0.02)[0]; if(Math.round(lo/st)%lonEvery===0 && bx>vx+w*0.08 && bx<vx+w*0.95) labs+=`<text class="lll" stroke-width="${(w/150).toFixed(2)}" text-anchor="middle" x="${bx.toFixed(1)}" y="${(vy+h-w*0.012).toFixed(1)}" font-size="${fsLon.toFixed(1)}">${llTag(lo,false)}</text>`;
+    const xx=(lo-lon0)*cs; grid+=`<line class="llg${lo===0?" eq":""}" x1="${xx}" x2="${xx}" y1="${vy}" y2="${vy+h}"/>`;
+    if(Math.round(lo/st)%lonEvery===0 && xx>vx+w*0.08 && xx<vx+w*0.95) labs+=`<text class="lll" style="stroke-width:${(w/150).toFixed(2)}" text-anchor="middle" x="${xx.toFixed(2)}" y="${(vy+h-w*0.012).toFixed(2)}" font-size="${fsLon.toFixed(2)}">${llTag(lo,false)}</text>`;
   }
-  const dots = pts.map(q=>{ const [px,py]=EE(q.lon,q.lat);
-    return `${q.ring?`<circle class="ring" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(10*u).toFixed(1)}" stroke-width="${(2*u).toFixed(2)}"/>`:""}<circle class="feat-pt" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(4.5*u).toFixed(1)}" stroke-width="${(1.3*u).toFixed(2)}"/>`
-      + (q.lab? `<g class="llab"><rect stroke-width="${(0.8*u).toFixed(2)}" x="${(px+6*u).toFixed(1)}" y="${(py-19*u).toFixed(1)}" width="${(17*u).toFixed(1)}" height="${(17*u).toFixed(1)}" rx="${(4*u).toFixed(1)}"/><text x="${(px+14.5*u).toFixed(1)}" y="${(py-6.3*u).toFixed(1)}" text-anchor="middle" font-size="${(12.5*u).toFixed(1)}">${q.lab}</text></g>` : ""); }).join("");
-  return `<svg class="wmap wfeat llmap" data-every="${lonEvery},${latEvery}" viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" role="img" aria-label="위선·경선이 그려진 지도"><rect class="sea" x="${vx-10}" y="${vy-10}" width="${w+20}" height="${h+20}"/><g stroke-width="${(w/300).toFixed(2)}">${paths}</g><g stroke-width="${(w/420).toFixed(2)}">${grid}</g>${labs}${dots}</svg>`;
+  const dots = pts.map(q=>{ const [px,py]=P(q.lon,q.lat);
+    return `${q.ring?`<circle class="ring" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(9*u).toFixed(2)}" style="stroke-width:${(2*u).toFixed(2)}"/>`:""}<circle class="feat-pt" cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(4.5*u).toFixed(2)}" style="stroke-width:${(1.3*u).toFixed(2)}"/>`
+      + (q.lab? `<g class="llab"><rect style="stroke-width:${(0.8*u).toFixed(2)}" x="${(px+6*u).toFixed(2)}" y="${(py-19*u).toFixed(2)}" width="${(17*u).toFixed(2)}" height="${(17*u).toFixed(2)}" rx="${(4*u).toFixed(2)}"/><text x="${(px+14.5*u).toFixed(2)}" y="${(py-6.3*u).toFixed(2)}" text-anchor="middle" font-size="${(12.5*u).toFixed(2)}">${q.lab}</text></g>` : ""); }).join("");
+  return `<svg class="wmap wfeat llmap" data-every="${lonEvery},${latEvery}" viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}" role="img" aria-label="위선·경선이 그려진 지도"><rect class="sea" x="${vx-1}" y="${vy-1}" width="${w+2}" height="${h+2}"/><g class="lland" style="stroke-width:${(w/320).toFixed(3)}">${paths}</g><g stroke-width="${(w/420).toFixed(3)}">${grid}</g>${labs}${dots}</svg>`;
 }
 function llNeighbors(x, r){   // 오답 후보: 한 칸씩 어긋난 교점 + 남북·동서 반구 바꾸기
   const st=x.step, c=[];
@@ -872,8 +890,10 @@ const BUILD = {
   llPick(x, r){   // 위경도를 보고 A~D 중 고르기
     const [s0,n0,w0,e0]=x.view, st=x.step, inner=[];
     for(let la=Math.ceil(s0/st)*st; la<=n0; la+=st) for(let lo=Math.ceil(w0/st)*st; lo<=e0; lo+=st) if(!(la===x.lat&&lo===x.lon) && la>s0 && la<n0 && lo>w0 && lo<e0) inner.push([la,lo]);
-    const near = llNeighbors(x, r).filter(p=>inner.some(q=>q[0]===p[0]&&q[1]===p[1]));
-    const others=[...near, ...shuffle(inner, r)].filter((p,i,a)=>a.findIndex(q=>q[0]===p[0]&&q[1]===p[1])===i).slice(0,3);
+    // 위도·경도를 둘 다 읽어야 고를 수 있게: 정답을 꼭짓점으로 하는 2×2 사각형 (같은 위도에 2개, 같은 경도에 2개)
+    const has=(la,lo)=>inner.some(q=>q[0]===la&&q[1]===lo);
+    const sq=shuffle([[st,st],[st,-st],[-st,st],[-st,-st]], r).map(([a,b])=>[[x.lat,x.lon+b],[x.lat+a,x.lon],[x.lat+a,x.lon+b]]).find(t=>t.every(p=>has(...p)));
+    const others = sq || [...llNeighbors(x, r).filter(p=>has(...p)), ...shuffle(inner, r)].filter((p,i,a)=>a.findIndex(q=>q[0]===p[0]&&q[1]===p[1])===i).slice(0,3);
     const all = shuffle([[x.lat,x.lon], ...others], r), L="ABCD";
     const ans = all.findIndex(p=>p[0]===x.lat&&p[1]===x.lon);
     const pts = all.map((p,i)=>({lat:p[0], lon:p[1], lab:L[i]}));
