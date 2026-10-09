@@ -146,8 +146,14 @@ def build_world(xlsx):
     for r in rows[1:]:
         d = dict(zip(hdr, r))
         if not d['사건ID']: continue
-        e = dict(id=d['사건ID'], y=d['연도_채택'], eff=d['연도_발효'], ko=d['사건명'].strip(), ja=(d['사건명_일'] or '').strip(), f=d['분야'],
-                 t=(d['유형'] or '').replace('・', '·'), g=d['등급'], core=(d['핵심 한 줄'] or '').strip(), c=d['관련국'] or '')
+        # 2026-10-09 마스터DB v2 기준: S·A·B 전부 + C 중 장기반복도≥4(=C*)만. 일반 C·N 제외, 수록='제외'(자료집 제외 지시)·자료집병합(중복) 행 제외
+        g = d['등급']
+        if g == 'C' and (d.get('장기반복도') or 0) >= 4: g = 'C*'
+        if g not in ('S', 'A', 'B', 'C*'): continue
+        if str(d.get('수록') or '').strip() == '제외' or d.get('자료집병합'): continue
+        eff = d['연도_발효'] if isinstance(d['연도_발효'], int) and d['연도_발효'] != d['연도_채택'] else None   # '미발효' 같은 글자는 무시
+        e = dict(id=d['사건ID'], y=d['연도_채택'], eff=eff, ko=d['사건명'].strip(), ja=(d['사건명_일'] or '').strip(), f=d['분야'],
+                 t=(d['유형'] or '').replace('・', '·'), g=g, core=(d['핵심 한 줄'] or '').strip(), c=d['관련국'] or '')
         if str(d.get('일본연표') or '').strip().upper() == 'O': e['jp'] = 1   # 마스터DB 일본연표 표시 → 통합본에서 세계연표 쪽 중복 출제 방지
         m2 = re.match(r'^(\([A-Za-z0-9 .\-/]+\))\s*(.*)$', e['ja'])
         if m2: e['ko'] = e['ko']+' '+m2.group(1); e['ja'] = m2.group(2)

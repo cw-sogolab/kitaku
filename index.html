@@ -411,7 +411,7 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 <main id="app" aria-live="polite"></main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="data.js?v=a9762625"></script>
+<script src="data.js?v=73375ecc"></script>
 <script>
 (function(){
 "use strict";
@@ -420,7 +420,7 @@ const D = window.KITAKU_DATA;
 /* ───────── 설정 (배포 때 여기만 고치면 됨) ───────── */
 const CONFIG = {
   defaultN: 20,
-  worldChrono: false,              // 세계 연표 범위 공개 여부 (자료 작업 끝나면 true 로)
+  worldChrono: true,               // 세계 연표 범위 공개 (2026-10-09: 마스터DB v2, S·A·B·C* 등급만)
   plannedBase: "https://cw-sogolab.github.io/kitaku/",
   statsUrl: "https://script.google.com/macros/s/AKfycbytdU_JiEpriYaMUKX3H9mpm0TjdFJ29Nu-zDm1QGyUQ7SWRdYahyf2_FujMYDMzZ08/exec",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
   secret: "kitaku-2026",
@@ -471,7 +471,7 @@ const WLAND = (D.wland || []).filter(x=>x.t!=="산"), WBELT = D.wbelts || {};
 const WLL = D.wll || [];   // 위경도 문항용 지점 (build/geo/llpoints.py)
 const WSTAT = (D.wstat || []).map(x=>({...x, ko: x.kind==="most" ? x.q+" 나라" : x.item+(x.meas?" "+x.meas:"")}));
 const WM = D.wmap, WPATH = Object.fromEntries((WM?WM.paths:[]).map(p=>[p.id,p]));
-const GW = {S:6, A:4, B:2.5, C:1.2, N:1};
+const GW = {S:6, A:4, B:2.5, "C*":1.5, C:1.2, N:1};   // C* = C 등급 중 장기반복도≥4 (세계 연표는 일반 C·N 제외)
 const SW = {3:4, 2:2.5, 1:1.2, 0:1};
 const SUBJ = { geo:["지리","var(--c-geo)"], his:["역사","var(--c-his)"], pol:["정치","var(--c-pol)"], eco:["경제","var(--c-eco)"], soc:["현대사회","var(--c-soc)"], all:["통합","#2E5A4C"], con:["개념","#6B4FA0"] };
 const FIELD2SUBJ = {"정치":"pol","경제":"eco","현대사회":"soc","역사":"his","지리":"geo"};
