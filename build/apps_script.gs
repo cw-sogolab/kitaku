@@ -8,12 +8,12 @@
  * KEY 를 아는 사람만 기록을 볼 수 있습니다. KEY 를 바꾸면 「배포 관리 → 편집 → 새 버전」으로 다시 배포하세요.
  * 코드를 고친 뒤에는 항상 「배포 → 배포 관리 → ✏️ 편집 → 버전: 새 버전 → 배포」 (URL은 그대로 유지됨)
  *
- * ?mode=rank (키 없이 공개): 학생 화면 랭킹용 — 이번 주·이번 달 상위 5명의 가린 이름(김○은)·정답률·문항 수만 돌려줌 (1분마다 새로 계산)
+ * ?mode=rank (키 없이 공개): 학생 화면 랭킹용 — 이번 주·이번 달 상위 5명의 이름(석 자, 2026-10-17 사용자 결정)·정답률·문항 수만 돌려줌 (1분마다 새로 계산)
  *   연습: 🎯 스나이퍼(첫 시도 정답률) · 🔥 갓생러(푼 문항 수) / 퇴실 퀴즈: 정답률만. 원외생 기록은 랭킹에서 뺌.
- * ?mode=who&id=6자리 (키 없이 공개, 2026-10-16): 일련번호 확인 — 원생명단 시트에서 찾아 「원생인지 + 가린 이름 + 반」만 돌려줌 (전체 이름은 절대 안 돌려줌)
+ * ?mode=who&id=6자리 (키 없이 공개, 2026-10-16): 일련번호 확인 — 원생명단 시트에서 찾아 「원생인지 + 가린 이름(김○은)」만 돌려줌 (번호를 마구 넣어 이름을 알아내지 못하게)
  *
  * 원생명단: 선생님 드라이브의 별도 구글 시트 「帰宅クイズ 원생명단」(공유하지 않음). 첫 시트 1행 머리글: 일련번호 · 이름 · 퀴즈반 · … · 상태
- *   상태가 「퇴원」이면 원외생 취급. 행은 지우지 말고 상태만 바꾸기.
+ *   한 번이라도 수업을 들은 원생은 지금 반·재원 여부와 상관없이 계속 이용 (2026-10-17 사용자 결정). 막아야 할 때만 상태를 「차단」으로. 행은 지우지 말 것.
  *   기록 시트의 이름 칸에는 원생이면 일련번호(6자리)가 들어옴 → 학생 분석(KEY)에서는 명단의 전체 이름으로 바꿔서 보여 줌.
  */
 const KEY = "여기에-비밀-키";            // 실제 키는 저장소에 올리지 말 것
@@ -62,12 +62,12 @@ function roster_() {
   const vals = SpreadsheetApp.openById(ROSTER_ID).getSheets()[0].getDataRange().getValues();
   const head = vals.shift().map(h => String(h).trim());
   const col = (re, d) => { const i = head.findIndex(h => re.test(h)); return i >= 0 ? i : d; };
-  const C = { id: col(/일련번호|번호/, 0), name: col(/^이름/, 1), cls: col(/퀴즈반|^반/, 2), st: col(/상태/, 4) };
+  const C = { id: col(/일련번호|번호/, 0), name: col(/^이름/, 1), st: col(/상태/, 4) };
   vals.forEach(r => {
     const id = String(r[C.id] || "").replace(/\D/g, ""); const name = String(r[C.name] || "").trim();
     if (!/^\d{6}$/.test(id) || !name) return;
     const st = String(r[C.st] || "").trim();
-    R.ids[id] = { name: name, cls: String(r[C.cls] || "").trim(), out: st === "퇴원" };
+    R.ids[id] = { name: name, out: st === "차단" };
     const b = base_(name); (R.base[b] = R.base[b] || []).push(id);   // 예전 기록(이름만 있는 것) 연결용
   });
   cache.put("roster", JSON.stringify(R), 300);   // 5분 캐시 — 명단을 고치면 5분 안에 반영
@@ -87,6 +87,8 @@ function match_(R, v) {   // 일련번호 → 명단 / 예전 이름 → 같은 
   return ids && ids.length === 1 ? Object.assign({ id: ids[0] }, R.ids[ids[0]]) : null;
 }
 
+function showName_(R, name) { const b = base_(name); return (R.base[b] || []).length > 1 ? name : b; }
+
 function who_(id) {
   if (!/^\d{6}$/.test(id)) return { ok: false, error: "id" };
   const cache = CacheService.getScriptCache(), mk = "who:" + Math.floor(Date.now() / 60000);
@@ -94,11 +96,11 @@ function who_(id) {
   if (n > 120) return { ok: false, error: "busy" };   // 1분에 120번 넘게 물으면 잠시 막음 (번호 마구 넣어 보기 방지)
   const r = roster_().ids[id];
   if (!r || r.out) return { ok: true, member: false };
-  return { ok: true, member: true, nm: mask_(r.name), cls: r.cls };
+  return { ok: true, member: true, nm: mask_(r.name) };
 }
 
 function rank_() {
-  const cache = CacheService.getScriptCache(), CK = "rank2:" + RANK_TOP + ":" + JSON.stringify(RANK_MIN), hit = cache.get(CK);   // 설정이 바뀌면 캐시도 새로
+  const cache = CacheService.getScriptCache(), CK = "rank3:" + RANK_TOP + ":" + JSON.stringify(RANK_MIN), hit = cache.get(CK);   // 설정이 바뀌면 캐시도 새로
   if (hit) return JSON.parse(hit);
   const ss = SpreadsheetApp.getActiveSpreadsheet(), tz = ss.getSpreadsheetTimeZone();
   const vals = sheet_().getDataRange().getValues(), head = vals.shift().map(h => String(h).trim());
@@ -119,7 +121,7 @@ function rank_() {
     if (!mt && /^\d{6}$/.test(raw)) return;                               // 명단에 없는 번호
     const key = mt ? mt.id : raw.replace(/\s+/g, "");
     if (!key || skip.has(base_(mt ? mt.name : raw)) || (!mt && !/^[가-힣A-Za-z]{2,}$/.test(key))) return;   // 「.」「기ㅁ현수」처럼 잘못 친 이름은 랭킹에서 제외
-    const name = mask_(mt ? mt.name : raw);                               // 랭킹은 가린 이름으로만
+    const name = mt ? showName_(R, mt.name) : raw;                        // 랭킹은 이름 석 자 (같은 이름이 명단에 둘 이상이면 (지역)까지)
     let sc = r[C.first]; if (sc instanceof Date) sc = Utilities.formatDate(sc, tz, "M/d");
     const m = String(sc).match(/(\d+)\s*\/\s*(\d+)/); if (!m || !+m[2]) return;
     const prac = cls === "연습" || /^연습 · /.test(String(r[C.set] || ""));

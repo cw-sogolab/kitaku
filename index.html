@@ -443,7 +443,7 @@ const CONFIG = {
   // 일련번호 입장 (2026-10-16): "serial" = 일련번호(원생) / 원외생, "name" = 예전처럼 이름 입력. 개발판에서 먼저 켜고 확인 후 본판도 "serial"
   auth: DEV ? "serial" : "name",
   contactUrl: "https://open.kakao.com/o/sFh5or9h",   // 원외생 「수업 문의하기」 → 선생님 오픈채팅 프로필
-  memberN: [10, 15, 20, 30, 50],                      // 원생 혼자 연습 문항 수
+  memberN: [10, 15, 20, 30],                          // 원생 혼자 연습 문항 수 (2026-10-17: 연습은 30까지)
   guestN: 10,                                         // 원외생은 10문항 고정
   guestSets: ["jp-region","jp-pref","jp-capital","g-country","g-climate","w-pol","w-geo","c-pol","c-geo"],   // 원외생이 풀 수 있는 범위 (사용자 지정)
   worldChrono: true,               // 세계 연표 범위 공개 (2026-10-09: 마스터DB v2, S·A·B·C* 등급만)
@@ -1185,17 +1185,16 @@ const clsFixed = ()=> !!CONFIG.classes[preset.c];   // QR(강사 설정)에 반�
 let entry = {cls: clsFixed()? preset.c : (CONFIG.classes[params.get("c")]? params.get("c") : null), name: store.get("lastName", null), raw:"", confirm:false}; if(!okName(entry.name)) entry.name=null;   // QR에 반이 없으면 학생이 직접 골라야 함(기본값 없음)
 /* ── 일련번호 입장 (CONFIG.auth==="serial") ── 원생: 6자리 번호(끝자리 확인숫자) → Apps Script가 가린 이름·반만 알려 줌 / 원외생: 아무 이름, 혼자 연습만 */
 const AUTH = CONFIG.auth==="serial";
-let me = AUTH ? store.get("me", null) : null;   // 원생 {id, nm(가린 이름), cls} · 원외생 {guest:true, nm}
+let me = AUTH ? store.get("me", null) : null;   // 원생 {id, nm(가린 이름)} · 원외생 {guest:true, nm} — 원생은 지금 어느 반이든 상관없이 전부 이용 (2026-10-17)
 let who = {raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0};
 const luhnOk = s => { if(!/^\d{6}$/.test(s)) return false; let t=0; [...s].reverse().forEach((ch,i)=>{ let d=+ch; if(i%2){ d*=2; if(d>9) d-=9; } t+=d; }); return t%10===0; };
 const isGuest = () => AUTH && !!(me && me.guest);
 const isMember = () => AUTH && !!(me && me.id);
 const guestOk = id => CONFIG.guestSets.includes(id);
-const meCls = () => isMember() ? String(me.cls||"").split("/").map(x=>x.trim()).find(c=>CONFIG.classes[c]) || null : null;
 const nOpts = () => !AUTH ? [10,20,30] : isGuest() ? [CONFIG.guestN] : CONFIG.memberN;
 function fixGuestPrac(){ if(!isGuest()) return; if(!guestOk(prac.set)) prac.set=CONFIG.guestSets[0]; prac.n=CONFIG.guestN; }
-if(isMember() && !clsFixed() && !entry.cls) entry.cls = meCls();
 fixGuestPrac();
+if(AUTH && !nOpts().includes(prac.n)) prac.n = 10;
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
@@ -1268,7 +1267,7 @@ function authBlock(practice){
       <button class="linkbtn" id="me-change" style="align-self:flex-start">일련번호가 있어요 →</button>`;
   if(who.found) return `<div class="whocard" role="alertdialog" aria-label="번호 확인"><span class="eyebrow">번호 확인</span>
       <div class="cf-name">${esc(who.found.nm)} 학생 맞나요?</div>
-      <div class="muted" style="font-size:13px">일련번호 ${esc(who.found.id)}${who.found.cls? " · "+esc(who.found.cls) : ""}</div>
+      <div class="muted" style="font-size:13px">일련번호 ${esc(who.found.id)}</div>
       <div class="cf-row"><button class="btn ghost" id="who-no">아니에요</button><button class="btn" id="who-yes">맞아요</button></div></div>`;
   return `<div class="field"><label for="sid">일련번호</label>
       <div class="sidrow"><input id="sid" class="nameinput mono" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="6자리 숫자" value="${esc(who.raw)}"><button class="btn ghost" id="sid-go" ${who.busy?"disabled":""}>${who.busy?"확인 중…":"확인"}</button></div>
@@ -1284,7 +1283,7 @@ function whoLookup(){
   who.busy=true; who.err=""; render();
   getJSON(url+(url.includes("?")?"&":"?")+"mode=who&id="+id, d=>{
       who.busy=false;
-      if(d && d.ok && d.member){ who.found={id, nm:d.nm, cls:d.cls||""}; who.fails=0; }
+      if(d && d.ok && d.member){ who.found={id, nm:d.nm}; who.fails=0; }
       else if(d && d.error==="busy") who.err="잠시 후 다시 시도해 주세요";
       else { who.err="등록되지 않은 번호예요. 선생님께 확인해 주세요"; if(++who.fails>=5){ who.lockUntil=Date.now()+60000; who.fails=0; } }
       render(); },
@@ -1295,8 +1294,8 @@ function bindAuth(practice){
   if(sid){ sid.oninput=()=>{ const v=sid.value.replace(/\D/g,"").slice(0,6); if(sid.value!==v) sid.value=v; who.raw=v; if(who.err){ who.err=""; const m=$("#sid-msg"); if(m){ m.textContent="선생님께 받은 번호를 넣어 주세요"; m.classList.remove("errmsg"); } } };
            sid.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); whoLookup(); } }; }
   const sg=$("#sid-go"); if(sg) sg.onclick=whoLookup;
-  const wy=$("#who-yes"); if(wy) wy.onclick=()=>{ me={id:who.found.id, nm:who.found.nm, cls:who.found.cls}; store.set("me", me); who={raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0};
-      if(!clsFixed()) entry.cls = meCls() || entry.cls; if(!CONFIG.memberN.includes(prac.n)) prac.n=10; render(); };
+  const wy=$("#who-yes"); if(wy) wy.onclick=()=>{ me={id:who.found.id, nm:who.found.nm}; store.set("me", me); who={raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0};
+      if(!CONFIG.memberN.includes(prac.n)) prac.n=10; render(); };
   const wn=$("#who-no"); if(wn) wn.onclick=()=>{ who.found=null; who.raw=""; render(); const x=$("#sid"); if(x) x.focus(); };
   const mc=$("#me-change"); if(mc) mc.onclick=()=>{ me=null; store.set("me", null); who={raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0}; render(); const x=$("#sid"); if(x) x.focus(); };
   const ag=$("#as-guest"); if(ag) ag.onclick=()=>{ me={guest:true, nm:""}; store.set("me", me); fixGuestPrac(); render(); const x=$("#gname"); if(x) x.focus(); };
@@ -1395,7 +1394,7 @@ function bindPractice(){
 function clsBtn(c){ const k=(CONFIG.classKind||{})[c]; return k&&k!==c? `<span class="ck">${esc(k)}</span>${esc(c)}` : esc(c); }
 function startQuiz(practice){
   if(AUTH ? gateMsg(practice) : (!entry.name || gateMsg(practice))) return;
-  if(AUTH && practice) fixGuestPrac();
+  if(AUTH && practice){ fixGuestPrac(); if(!nOpts().includes(prac.n)) prac.n=10; }
   if(!practice && clsFixed()) entry.cls = preset.c;
   if(!AUTH) store.set("lastName", entry.name); if(!practice) store.set("lastCls", entry.cls);
   const set=setById(practice? prac.set : preset.set);
