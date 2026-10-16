@@ -10,11 +10,11 @@
  *
  * ?mode=rank (키 없이 공개): 학생 화면 랭킹용 — 이번 주·이번 달 상위 5명의 이름(석 자, 2026-10-17 사용자 결정)·정답률·문항 수만 돌려줌 (1분마다 새로 계산)
  *   연습: 🎯 스나이퍼(첫 시도 정답률) · 🔥 갓생러(푼 문항 수) / 퇴실 퀴즈: 정답률만. 원외생 기록은 랭킹에서 뺌.
- * ?mode=who&id=6자리 (키 없이 공개, 2026-10-16): 일련번호 확인 — 원생명단 시트에서 찾아 「원생인지 + 가린 이름(김○은)」만 돌려줌 (번호를 마구 넣어 이름을 알아내지 못하게)
+ * ?mode=who&id=일련번호 (키 없이 공개, 2026-10-16 · 2026-10-17부터 영문 2 + 숫자 6, 예: KM482913): 일련번호 확인 — 원생명단 시트에서 찾아 「원생인지 + 가린 이름(김○은)」만 돌려줌 (번호를 마구 넣어 이름을 알아내지 못하게)
  *
  * 원생명단: 선생님 드라이브의 별도 구글 시트 「帰宅クイズ 원생명단」(공유하지 않음). 첫 시트 1행 머리글: 일련번호 · 이름 · 퀴즈반 · … · 상태
  *   한 번이라도 수업을 들은 원생은 지금 반·재원 여부와 상관없이 계속 이용 (2026-10-17 사용자 결정). 막아야 할 때만 상태를 「차단」으로. 행은 지우지 말 것.
- *   기록 시트의 이름 칸에는 원생이면 일련번호(6자리)가 들어옴 → 학생 분석(KEY)에서는 명단의 전체 이름으로 바꿔서 보여 줌.
+ *   기록 시트의 이름 칸에는 원생이면 일련번호(영문 2 + 숫자 6)가 들어옴 → 학생 분석(KEY)에서는 명단의 전체 이름으로 바꿔서 보여 줌.
  */
 const KEY = "여기에-비밀-키";            // 실제 키는 저장소에 올리지 말 것
 const ROSTER_ID = "여기에-명단-시트-ID";   // 원생명단 시트 주소의 /d/ 와 /edit 사이 값. 저장소에 올리지 말 것
@@ -23,11 +23,13 @@ const RANK_EXCLUDE = ["현채원"];          // 랭킹에서 뺄 이름 (선생�
 const RANK_TOP = 5;                       // 몇 위까지 보여줄지
 const RANK_MIN = { prac: 50, clsWeek: 1, clsMonth: 3 };   // 랭킹 조건: 연습 50문항 이상 / 퇴실 퀴즈 이번 주 1회·이번 달 3회 이상
 const GUEST_CLS = "원외생";               // 원외생 기록의 반 이름 (랭킹 제외)
+const SID_RE = /^[A-Z]{2}\d{6}$/;         // 일련번호 형식 (영문 2 + 숫자 6)
+function sidNorm_(v) { return String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (p.mode === "rank") return out_(rank_(), p.callback);
-  if (p.mode === "who") return out_(who_(String(p.id || "")), p.callback);
+  if (p.mode === "who") return out_(who_(p.id), p.callback);
   if (p.key !== KEY) return out_({ ok: false, error: "key" }, p.callback);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = sheet_();   // 설문 응답 시트(첫 칸이 타임스탬프인 시트), 없으면 첫 시트
@@ -64,8 +66,8 @@ function roster_() {
   const col = (re, d) => { const i = head.findIndex(h => re.test(h)); return i >= 0 ? i : d; };
   const C = { id: col(/일련번호|번호/, 0), name: col(/^이름/, 1), st: col(/상태/, 4) };
   vals.forEach(r => {
-    const id = String(r[C.id] || "").replace(/\D/g, ""); const name = String(r[C.name] || "").trim();
-    if (!/^\d{6}$/.test(id) || !name) return;
+    const id = sidNorm_(r[C.id]); const name = String(r[C.name] || "").trim();
+    if (!SID_RE.test(id) || !name) return;
     const st = String(r[C.st] || "").trim();
     R.ids[id] = { name: name, out: st === "차단" };
     const b = base_(name); (R.base[b] = R.base[b] || []).push(id);   // 예전 기록(이름만 있는 것) 연결용
@@ -81,8 +83,8 @@ function mask_(name) {
   return b[0] + "○".repeat(b.length - 2) + b[b.length - 1];
 }
 function match_(R, v) {   // 일련번호 → 명단 / 예전 이름 → 같은 이름이 명단에 하나뿐이면 그 학생
-  const s = String(v || "").trim();
-  if (/^\d{6}$/.test(s)) return R.ids[s] ? Object.assign({ id: s }, R.ids[s]) : null;
+  const s = String(v || "").trim(), sn = sidNorm_(s);
+  if (SID_RE.test(sn)) return R.ids[sn] ? Object.assign({ id: sn }, R.ids[sn]) : null;
   const ids = R.base[base_(s)];
   return ids && ids.length === 1 ? Object.assign({ id: ids[0] }, R.ids[ids[0]]) : null;
 }
@@ -90,7 +92,8 @@ function match_(R, v) {   // 일련번호 → 명단 / 예전 이름 → 같은 
 function showName_(R, name) { const b = base_(name); return (R.base[b] || []).length > 1 ? name : b; }
 
 function who_(id) {
-  if (!/^\d{6}$/.test(id)) return { ok: false, error: "id" };
+  id = sidNorm_(id);
+  if (!SID_RE.test(id)) return { ok: false, error: "id" };
   const cache = CacheService.getScriptCache(), mk = "who:" + Math.floor(Date.now() / 60000);
   const n = +(cache.get(mk) || 0) + 1; cache.put(mk, String(n), 120);
   if (n > 120) return { ok: false, error: "busy" };   // 1분에 120번 넘게 물으면 잠시 막음 (번호 마구 넣어 보기 방지)
@@ -118,7 +121,7 @@ function rank_() {
     const cls = String(r[C.cls] || "").trim();
     if (cls === GUEST_CLS) return;                                        // 원외생은 랭킹 제외
     const raw = String(r[C.name] || "").trim(), mt = match_(R, raw);
-    if (!mt && /^\d{6}$/.test(raw)) return;                               // 명단에 없는 번호
+    if (!mt && SID_RE.test(sidNorm_(raw))) return;                               // 명단에 없는 번호
     const key = mt ? mt.id : raw.replace(/\s+/g, "");
     if (!key || skip.has(base_(mt ? mt.name : raw)) || (!mt && !/^[가-힣A-Za-z]{2,}$/.test(key))) return;   // 「.」「기ㅁ현수」처럼 잘못 친 이름은 랭킹에서 제외
     const name = mt ? showName_(R, mt.name) : raw;                        // 랭킹은 이름 석 자 (같은 이름이 명단에 둘 이상이면 (지역)까지)
