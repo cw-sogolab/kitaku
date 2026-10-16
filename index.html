@@ -411,11 +411,21 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 <main id="app" aria-live="polite"></main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="data.js?v=bb62b6e6"></script>
+<script src="data.js?v=65477f5e"></script>
 <script>
 (function(){
 "use strict";
 const D = window.KITAKU_DATA;
+/* ───────── 개발판 (2026-10-16) ─────────
+   cw-sogolab.github.io/kitaku/dev/ 에서 열리면 개발판: 화면 위 빨간 띠, 기록 시트로 안 보냄, 폰 저장 공간을 본판과 따로 씀(kitaku-dev.*).
+   새 기능은 CONFIG에서 DEV일 때만 켜서 먼저 dev/ 에 올려 보고, 확인되면 본판에도 켬. */
+const DEV = /\/dev\/(index\.html|test\.html)?$/.test(location.pathname);
+const SK = DEV ? "kitaku-dev." : "kitaku.";
+if(DEV){ document.title = "[개발판] " + document.title;
+  const bar=document.createElement("div"); bar.id="devbar"; bar.textContent="개발판 · 학생 공유 금지 · 기록 저장 안 됨";
+  bar.style.cssText="position:sticky;top:0;z-index:999;background:#d93025;color:#fff;font:600 12px/1.4 system-ui,sans-serif;text-align:center;padding:5px 8px";
+  document.body.insertBefore(bar, document.body.firstChild);
+  const m=document.createElement("meta"); m.name="robots"; m.content="noindex"; document.head.appendChild(m); }
 
 /* ───────── 설정 (배포 때 여기만 고치면 됨) ───────── */
 const CONFIG = {
@@ -455,8 +465,8 @@ const fmtTime = d => [d.getHours(),d.getMinutes(),d.getSeconds()].map(x=>String(
 const fmtDur = ms => { const s=Math.round(ms/1000); return Math.floor(s/60)+"분 "+String(s%60).padStart(2,"0")+"초"; };
 const dailyCode = (date, setId) => String(hashStr(CONFIG.secret+"|"+date+"|"+setId) % 10000).padStart(4,"0");
 const store = {
-  get(k, d){ try{ const v=localStorage.getItem("kitaku."+k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
-  set(k, v){ try{ localStorage.setItem("kitaku."+k, JSON.stringify(v)); }catch(e){} }
+  get(k, d){ try{ let v=localStorage.getItem(SK+k); if(v==null && DEV && /^an\./.test(k)) v=localStorage.getItem("kitaku."+k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },   // 개발판: 학생 분석 연결 설정은 본판 것을 빌려 씀
+  set(k, v){ try{ localStorage.setItem(SK+k, JSON.stringify(v)); }catch(e){} }
 };
 
 /* ───────── 데이터 ───────── */
@@ -1153,7 +1163,7 @@ let prac = store.get("prac", {set:"jp-region", n:10});
 preset.set = okSet(preset.set); prac.set = okPrac(prac.set);
 const home = () => mode==="class" ? "entry" : "practice";
 let S = null;         // 퀴즈 진행 상태
-const tUnlocked = ()=>{ try{ return sessionStorage.getItem("kitaku.t")==="1"; }catch(e){ return false; } };
+const tUnlocked = ()=>{ try{ return sessionStorage.getItem(SK+"t")==="1"; }catch(e){ return false; } };
 let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : home();
 const clsFixed = ()=> !!CONFIG.classes[preset.c];   // QR(강사 설정)에 반이 들어 있으면 학생은 반을 고르지 않음
 let entry = {cls: clsFixed()? preset.c : (CONFIG.classes[params.get("c")]? params.get("c") : null), name: store.get("lastName", null), raw:"", confirm:false}; if(!okName(entry.name)) entry.name=null;   // QR에 반이 없으면 학생이 직접 골라야 함(기본값 없음)
@@ -1184,7 +1194,7 @@ function renderPin(){
 function bindPin(){
   const inp=$("#pin"), msg=$("#pin-msg");
   const tryPin=()=>{
-    if(hashStr(inp.value.trim())===CONFIG.teacherPinHash){ try{ sessionStorage.setItem("kitaku.t","1"); }catch(e){} $("#nav-teacher").hidden=false; go("teacher"); }
+    if(hashStr(inp.value.trim())===CONFIG.teacherPinHash){ try{ sessionStorage.setItem(SK+"t","1"); }catch(e){} $("#nav-teacher").hidden=false; go("teacher"); }
     else { msg.textContent="PIN이 달라요."; inp.value=""; inp.focus(); }
   };
   $("#pin-go").onclick=tryPin;
@@ -1417,6 +1427,7 @@ function finish(){
 }
 function submit(rec){
   const f=CONFIG.form;
+  if(DEV){ console.log("[개발판] 기록 안 보냄", rec); return true; }   // 개발판 기록은 시트로 보내지 않음
   if(!f.url) return false;
   try{
     const fd=new FormData();
@@ -1590,9 +1601,9 @@ function getJSON(url, ok, fail){
 function rankUrl(){ return CONFIG.statsUrl || store.get("an.url", ""); }
 function rankLoad(force){
   const url=rankUrl(); if(!url){ RK.err="none"; render(); return; }
-  if(!force){ try{ const c=JSON.parse(sessionStorage.getItem("kitaku.rank")||"null"); if(c && Date.now()-c.t<60000){ RK.data=c.d; RK.at=c.t; render(); return; } }catch(e){} }
+  if(!force){ try{ const c=JSON.parse(sessionStorage.getItem(SK+"rank")||"null"); if(c && Date.now()-c.t<60000){ RK.data=c.d; RK.at=c.t; render(); return; } }catch(e){} }
   RK.loading=true; RK.err=null; render();
-  getJSON(url+(url.includes("?")?"&":"?")+"mode=rank", d=>{ RK.loading=false; if(d && d.ok){ RK.data=d; RK.at=Date.now(); try{ sessionStorage.setItem("kitaku.rank", JSON.stringify({t:RK.at, d})); }catch(e){} } else RK.err="net"; render(); },
+  getJSON(url+(url.includes("?")?"&":"?")+"mode=rank", d=>{ RK.loading=false; if(d && d.ok){ RK.data=d; RK.at=Date.now(); try{ sessionStorage.setItem(SK+"rank", JSON.stringify({t:RK.at, d})); }catch(e){} } else RK.err="net"; render(); },
     ()=>{ RK.loading=false; RK.err="net"; render(); });
 }
 function openRank(kind, back){ RK.kind=kind; RK.back=back; if(!RK.cls) RK.cls = entry.cls || preset.c || "전체"; go("rank"); window.scrollTo(0,0); }
@@ -1644,7 +1655,7 @@ function bindRank(){
 let rankTimer=null;
 
 /* ───────── 강사 화면 ───────── */
-let tstate = {cls:preset.c || Object.keys(CONFIG.classes)[0], set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem("kitaku.ttab")||"set"; }catch(e){ return "set"; } })()};
+let tstate = {cls:preset.c || Object.keys(CONFIG.classes)[0], set:preset.set, n:preset.n, tab:(()=>{ try{ return sessionStorage.getItem(SK+"ttab")||"set"; }catch(e){ return "set"; } })()};
 const tSel = () => String(tstate.set||"all").split(",");
 function studentURL(){
   const onPages = /github\.io$/.test(location.hostname);
@@ -1693,7 +1704,7 @@ function renderTeacher(){
   </div>`;
 }
 function bindTeacher(){
-  document.querySelectorAll("[data-ttab]").forEach(b=>b.onclick=()=>{ tstate.tab=b.dataset.ttab; try{ sessionStorage.setItem("kitaku.ttab", tstate.tab); }catch(e){} render(); });
+  document.querySelectorAll("[data-ttab]").forEach(b=>b.onclick=()=>{ tstate.tab=b.dataset.ttab; try{ sessionStorage.setItem(SK+"ttab", tstate.tab); }catch(e){} render(); });
   if(tstate.tab==="an"){ bindAnalysis(); return; }
   document.querySelectorAll("[data-tcls]").forEach(b=>b.onclick=()=>{ tstate.cls=b.dataset.tcls; render(); });
   document.querySelectorAll("[data-tn]").forEach(b=>b.onclick=()=>{ tstate.n=+b.dataset.tn; render(); });
@@ -1703,7 +1714,7 @@ function bindTeacher(){
     const order = SETS.map(s=>s.id); sel.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
     tstate.set = sel.join(","); render(); });
   $("#clear-local").onclick=()=>{ if(!confirm("이 기기에 저장된 풀이 기록(오늘 퇴실 기록·지난 점수)을 모두 지울까요? 시트 기록은 그대로예요.")) return;
-    try{ Object.keys(localStorage).filter(k=>/^kitaku\.(log|mylog|hist\.|phist\.)/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){} render(); };
+    try{ Object.keys(localStorage).filter(k=>k.startsWith(SK) && /^(log|mylog|hist\.|phist\.)/.test(k.slice(SK.length))).forEach(k=>localStorage.removeItem(k)); }catch(e){} render(); };
   $("#preview").onclick=()=>{ preset={...tstate, date:today()}; store.set("preset2", preset); mode="class"; entry={cls:tstate.cls, name:null}; S=null; go("entry"); };
   const box=$("#qr");
   if(window.QRCode){ try{ new QRCode(box,{text:studentURL(),width:400,height:400,colorDark:"#15211C",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M}); }catch(e){ box.textContent="QR 생성 실패"; } }
@@ -1769,11 +1780,11 @@ function anParse(head, rows){
 function anLoad(force){
   const {url,key}=anConf();
   if(!url || !key){ AN.setup=true; render(); return; }
-  if(!force && !AN.recs){ try{ const c=JSON.parse(sessionStorage.getItem("kitaku.an")||"null"); if(c){ AN.raw=c; AN.recs=anParse(c.head,c.rows); AN.at=new Date(c.at); render(); return; } }catch(e){} }
+  if(!force && !AN.recs){ try{ const c=JSON.parse(sessionStorage.getItem(SK+"an")||"null"); if(c){ AN.raw=c; AN.recs=anParse(c.head,c.rows); AN.at=new Date(c.at); render(); return; } }catch(e){} }
   AN.loading=true; AN.err=null; render();
   getJSON(url+(url.includes("?")?"&":"?")+"key="+encodeURIComponent(key), d=>{ AN.loading=false;
     if(!d || !d.ok){ AN.err = d && d.error==="key" ? "key" : "net"; }
-    else { AN.raw=d; AN.recs=anParse(d.head, d.rows); AN.at=new Date(d.at||Date.now()); AN.setup=false; try{ sessionStorage.setItem("kitaku.an", JSON.stringify(d)); }catch(e){} }
+    else { AN.raw=d; AN.recs=anParse(d.head, d.rows); AN.at=new Date(d.at||Date.now()); AN.setup=false; try{ sessionStorage.setItem(SK+"an", JSON.stringify(d)); }catch(e){} }
     render(); }, ()=>{ AN.loading=false; AN.err="net"; render(); });
 }
 
@@ -1920,7 +1931,7 @@ function bindAnalysis(){
   on("#an-reload", ()=>anLoad(true));
   on("#an-setup-btn", ()=>{ AN.setup=!AN.setup; render(); });
   on("#an-back", ()=>{ AN.stu=null; render(); window.scrollTo(0,0); });
-  on("#an-save", ()=>{ const u=$("#an-url").value.trim(), k=$("#an-key").value.trim(); if(!u||!k) return; store.set("an.url", u); store.set("an.key", k); AN.setup=false; AN.recs=null; try{ sessionStorage.removeItem("kitaku.an"); }catch(e){} anLoad(true); });
+  on("#an-save", ()=>{ const u=$("#an-url").value.trim(), k=$("#an-key").value.trim(); if(!u||!k) return; store.set("an.url", u); store.set("an.key", k); AN.setup=false; AN.recs=null; try{ sessionStorage.removeItem(SK+"an"); }catch(e){} anLoad(true); });
   document.querySelectorAll("[data-acls]").forEach(b=>b.onclick=()=>{ AN.cls=b.dataset.acls; render(); });
   document.querySelectorAll("[data-akind]").forEach(b=>b.onclick=()=>{ AN.kind=b.dataset.akind; render(); });
   document.querySelectorAll("[data-adays]").forEach(b=>b.onclick=()=>{ AN.days=+b.dataset.adays; render(); });

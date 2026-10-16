@@ -192,3 +192,12 @@ kitaku-quiz/
 - 일본 연표: 161 → 221개. 자료집 표기가 「[발효 1890]」(띄어쓰기)·「[-1895]」(하이픈)으로 바뀌어 예전 파서가 연도를 이름에 남긴 채 걸러 버리던 문제 → build_jphis 정규식이 두 표기 모두 처리하도록 수정.
 - 연표 자료를 고칠 때마다 재빌드 필요(자동 반영 아님): `python3 build/build_data.py --jp <일본 자료집.docx> --db <EJU_연표DB.xlsx> --wg <세계지리 자료집.docx>`.
 - 푸시 메모(2026-10-16): 일반 `git push` 가 리다이렉트에서 인증을 잃고 실패(could not read Username) → 원격 주소 끝에 `/`를 붙이고 `http.extraHeader` 로 Basic 인증을 넣어 `git push https://github.com/cw-sogolab/kitaku.git/ HEAD:main` 하면 됨(토큰은 출력하지 말 것).
+
+## 일본 연표 등급 필터 (2026-10-16 사용자 지시)
+- 일본 연표도 세계 연표처럼 **S·A·B·C\*만** (자료집 「급」 칸 그대로, 일반 C·N 제외) → 221 → 66개 (S4·A14·B45·C*3). build_jphis 에서 거름. 등급의 * 는 이제 떼지 않음(GW["C*"]=1.5).
+
+## 개발판 dev/ (2026-10-16)
+- 주소: https://cw-sogolab.github.io/kitaku/dev/ — 같은 index.html 을 dev/ 폴더에 복사해 둔 것(+ dev/data.js, 아이콘).
+- 경로가 /dev/ 이면 `DEV=true`: 화면 위 빨간 띠, 제목 앞 [개발판], 기록을 구글 폼으로 안 보냄(콘솔만), 폰 저장 키를 `kitaku-dev.*` 로 따로 씀(본판 기록·설정과 안 섞임), noindex. 학생 분석 연결(an.url·an.key)만 본판 저장값을 빌려 씀.
+- 작업 순서: 새 기능은 `CONFIG.xxx: DEV ? 켬 : 끔` 처럼 dev 에서만 켜서 dev/ 에 먼저 올림 → 선생님이 폰으로 확인 → 본판(루트)에도 켜고 루트 index.html·data.js 갱신. 평소 데이터만 바꿀 때는 루트와 dev/ 둘 다 같은 파일로 맞춰 둘 것.
+- 퇴근 미션 QR 은 열린 주소 기준이라 dev 에서 만든 QR 은 dev 로 감.

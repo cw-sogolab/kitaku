@@ -134,11 +134,12 @@ def build_jphis(d):
         if ja.startswith(')'): ko += ')'; ja = ja[1:].strip()
         m2 = re.match(r'^(\([A-Za-z0-9 .\-/]+\))\s*(.*)$', ja)
         if m2: ko = ko+' '+m2.group(1); ja = m2.group(2)
-        rows.append(dict(y=int(yr_), eff=eff, ko=ko, ja=ja, core=core.replace('\n', ' '), w=withc, g=gr.replace('*', '')))
+        rows.append(dict(y=int(yr_), eff=eff, ko=ko, ja=ja, core=core.replace('\n', ' '), w=withc, g=gr.strip()))
     # 자료집 오류: 1945년 6건이 1942 칸에 병합됨
     for r in rows:
         if r['ko'] in {'오키나와 전투', '히로시마·나가사키 원폭투하', '포츠담 선언', 'GHQ의 간접통치 개시', '노동조합법', '여성참정권 확립'}: r['y'] = 1945
-    return [r for r in rows if r['y'] < 2020 and not YEAR_IN_NAME.search(r['ko']+r['ja'])]
+    # 2026-10-16 사용자 지시: 일본 연표도 세계 연표처럼 S·A·B·C* 등급만 (자료집 「급」 칸 그대로, 일반 C·N 제외)
+    return [r for r in rows if r['g'] in ('S', 'A', 'B', 'C*') and r['y'] < 2020 and not YEAR_IN_NAME.search(r['ko']+r['ja'])]
 
 def build_world(xlsx):
     ws = openpyxl.load_workbook(xlsx, read_only=True)['연표DB']
