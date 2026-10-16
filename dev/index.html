@@ -107,6 +107,16 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .confirmcard{display:flex;flex-direction:column;gap:10px;text-align:center;align-items:center;border:2px solid var(--go)}
 .confirmcard .cf-name{font-family:var(--f-disp);font-size:28px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
 .confirmcard .clschip2{font-size:13px;font-weight:700;background:var(--go);color:var(--go-ink);border-radius:999px;padding:4px 10px;font-family:inherit}
+.mebox{display:flex;align-items:center;gap:10px;background:var(--paper-2);border-radius:14px;padding:12px 14px;flex-wrap:wrap}
+.mebox b{font-size:18px}.mebox .linkbtn{margin-left:auto}
+.sidrow{display:grid;grid-template-columns:1fr auto;gap:8px}.sidrow .btn{padding:0 18px;min-height:0}
+.sidrow .nameinput{letter-spacing:.12em}
+.whocard{display:flex;flex-direction:column;gap:10px;text-align:center;align-items:center;border:2px solid var(--go);border-radius:16px;padding:14px}
+.whocard .cf-name{font-family:var(--f-disp);font-size:26px;font-weight:700;color:var(--ink)}
+.whocard .cf-row{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;width:100%}
+.errmsg{color:#d93025}
+.contactcard{display:flex;flex-direction:column;gap:8px;text-align:center}
+.contactcard .btn{text-decoration:none;display:flex;align-items:center;justify-content:center}
 .confirmcard .cf-row{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;width:100%}
 .chips .clschip{background:var(--go);color:var(--go-ink)}
 .seg button .ck{display:block;font-size:10px;font-weight:600;letter-spacing:.04em;opacity:.7;margin-bottom:1px}
@@ -430,6 +440,12 @@ if(DEV){ document.title = "[개발판] " + document.title;
 /* ───────── 설정 (배포 때 여기만 고치면 됨) ───────── */
 const CONFIG = {
   defaultN: 20,
+  // 일련번호 입장 (2026-10-16): "serial" = 일련번호(원생) / 원외생, "name" = 예전처럼 이름 입력. 개발판에서 먼저 켜고 확인 후 본판도 "serial"
+  auth: DEV ? "serial" : "name",
+  contactUrl: "https://open.kakao.com/o/sFh5or9h",   // 원외생 「수업 문의하기」 → 선생님 오픈채팅 프로필
+  memberN: [10, 15, 20, 30, 50],                      // 원생 혼자 연습 문항 수
+  guestN: 10,                                         // 원외생은 10문항 고정
+  guestSets: ["jp-region","jp-pref","jp-capital","g-country","g-climate","w-pol","w-geo","c-pol","c-geo"],   // 원외생이 풀 수 있는 범위 (사용자 지정)
   worldChrono: true,               // 세계 연표 범위 공개 (2026-10-09: 마스터DB v2, S·A·B·C* 등급만)
   plannedBase: "https://cw-sogolab.github.io/kitaku/",
   statsUrl: "https://script.google.com/macros/s/AKfycbytdU_JiEpriYaMUKX3H9mpm0TjdFJ29Nu-zDm1QGyUQ7SWRdYahyf2_FujMYDMzZ08/exec",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
@@ -1167,6 +1183,19 @@ const tUnlocked = ()=>{ try{ return sessionStorage.getItem(SK+"t")==="1"; }catch
 let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : home();
 const clsFixed = ()=> !!CONFIG.classes[preset.c];   // QR(강사 설정)에 반이 들어 있으면 학생은 반을 고르지 않음
 let entry = {cls: clsFixed()? preset.c : (CONFIG.classes[params.get("c")]? params.get("c") : null), name: store.get("lastName", null), raw:"", confirm:false}; if(!okName(entry.name)) entry.name=null;   // QR에 반이 없으면 학생이 직접 골라야 함(기본값 없음)
+/* ── 일련번호 입장 (CONFIG.auth==="serial") ── 원생: 6자리 번호(끝자리 확인숫자) → Apps Script가 가린 이름·반만 알려 줌 / 원외생: 아무 이름, 혼자 연습만 */
+const AUTH = CONFIG.auth==="serial";
+let me = AUTH ? store.get("me", null) : null;   // 원생 {id, nm(가린 이름), cls} · 원외생 {guest:true, nm}
+let who = {raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0};
+const luhnOk = s => { if(!/^\d{6}$/.test(s)) return false; let t=0; [...s].reverse().forEach((ch,i)=>{ let d=+ch; if(i%2){ d*=2; if(d>9) d-=9; } t+=d; }); return t%10===0; };
+const isGuest = () => AUTH && !!(me && me.guest);
+const isMember = () => AUTH && !!(me && me.id);
+const guestOk = id => CONFIG.guestSets.includes(id);
+const meCls = () => isMember() ? String(me.cls||"").split("/").map(x=>x.trim()).find(c=>CONFIG.classes[c]) || null : null;
+const nOpts = () => !AUTH ? [10,20,30] : isGuest() ? [CONFIG.guestN] : CONFIG.memberN;
+function fixGuestPrac(){ if(!isGuest()) return; if(!guestOk(prac.set)) prac.set=CONFIG.guestSets[0]; prac.n=CONFIG.guestN; }
+if(isMember() && !clsFixed() && !entry.cls) entry.cls = meCls();
+fixGuestPrac();
 let clockTimer = null, advTimer = null, lockTimer = null;
 
 function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
@@ -1205,7 +1234,7 @@ function bindPin(){
 /* ───────── 화면: 입장 ───────── */
 function renderEntry(){
   const set = setById(preset.set), [sn, sc] = SUBJ[set.subj];
-  const hist = entry.name ? store.get("hist."+entry.name+"."+set.id, []) : [];
+  const hk = AUTH ? (isMember()? me.id : null) : entry.name, hist = hk ? store.get("hist."+hk+"."+set.id, []) : [];
   return `<div class="wrap">
     <section class="card setcard">
       <div class="stk s1">♡</div><div class="stk s2">☆</div>
@@ -1218,24 +1247,79 @@ function renderEntry(){
       ${clsFixed()? "" : `<div class="field"><span class="lbl">반</span>
         <div class="seg" role="group" aria-label="반 선택">${Object.keys(CONFIG.classes).map(c=>`<button data-cls="${esc(c)}" aria-pressed="${c===entry.cls}">${clsBtn(c)}</button>`).join("")}</div>
       </div>`}
-      <div class="field"><label for="name">이름</label>
+      ${AUTH? authBlock(false) : `<div class="field"><label for="name">이름</label>
         <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="성과 이름 (예: 김하늘)" value="${esc(entry.name||entry.raw||"")}">
-      </div>
+      </div>`}
       ${hist.length?`<div class="muted" style="font-size:13px">지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
     ${startArea(false)}
     <div class="linkrow"><button class="linkbtn" id="to-rank">🏆 퇴실 퀴즈 랭킹 →</button><button class="linkbtn" id="to-prac">집에서 혼자 연습하기 →</button></div>
+    ${AUTH && !isMember()? contactCard("원외생이라면 수업 문의는 여기로") : ""}
   </div>`;
+}
+function contactCard(msg){
+  return `<section class="card contactcard"><div class="muted" style="font-size:13px">${msg||"수업이 궁금하다면 편하게 물어보세요"}</div>
+    <a class="btn ghost" href="${esc(CONFIG.contactUrl)}" target="_blank" rel="noopener">💬 수업 문의하기 (카카오톡)</a></section>`;
+}
+function authBlock(practice){
+  if(isMember()) return `<div class="field"><span class="lbl">내 번호</span><div class="mebox"><b>${esc(me.nm)}</b><span class="mono muted">${esc(me.id)}</span><button class="linkbtn" id="me-change">번호 바꾸기</button></div></div>`;
+  if(isGuest() && practice) return `<div class="field"><label for="gname">이름 <span class="muted" style="font-weight:400">(원외생 · 아무 이름이나)</span></label>
+      <input id="gname" class="nameinput" type="text" maxlength="20" autocomplete="off" placeholder="예: 하늘" value="${esc(me.nm||"")}"></div>
+      <button class="linkbtn" id="me-change" style="align-self:flex-start">일련번호가 있어요 →</button>`;
+  if(who.found) return `<div class="whocard" role="alertdialog" aria-label="번호 확인"><span class="eyebrow">번호 확인</span>
+      <div class="cf-name">${esc(who.found.nm)} 학생 맞나요?</div>
+      <div class="muted" style="font-size:13px">일련번호 ${esc(who.found.id)}${who.found.cls? " · "+esc(who.found.cls) : ""}</div>
+      <div class="cf-row"><button class="btn ghost" id="who-no">아니에요</button><button class="btn" id="who-yes">맞아요</button></div></div>`;
+  return `<div class="field"><label for="sid">일련번호</label>
+      <div class="sidrow"><input id="sid" class="nameinput mono" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="6자리 숫자" value="${esc(who.raw)}"><button class="btn ghost" id="sid-go" ${who.busy?"disabled":""}>${who.busy?"확인 중…":"확인"}</button></div>
+      <div class="muted ${who.err?"errmsg":""}" id="sid-msg" style="font-size:13px;min-height:1.2em">${esc(who.err || "선생님께 받은 번호를 넣어 주세요")}</div></div>
+    ${practice? `<button class="linkbtn" id="as-guest" style="align-self:flex-start">일련번호가 없어요 (원외생) →</button>`
+              : `<p class="muted" style="font-size:12px;margin:0">퇴근 미션은 원생만 할 수 있어요. 원외생은 「혼자 연습하기」로 풀어 보세요.</p>`}`;
+}
+function whoLookup(){
+  const id=who.raw;
+  if(Date.now()<who.lockUntil){ who.err="잠시 후 다시 시도해 주세요"; render(); return; }
+  if(!luhnOk(id)){ who.err = id.length<6? "6자리를 모두 넣어 주세요" : "번호를 다시 확인해 주세요"; if(id.length===6 && ++who.fails>=5){ who.lockUntil=Date.now()+60000; who.fails=0; } render(); return; }
+  const url=rankUrl(); if(!url){ who.err="지금은 확인할 수 없어요. 선생님께 말씀해 주세요"; render(); return; }
+  who.busy=true; who.err=""; render();
+  getJSON(url+(url.includes("?")?"&":"?")+"mode=who&id="+id, d=>{
+      who.busy=false;
+      if(d && d.ok && d.member){ who.found={id, nm:d.nm, cls:d.cls||""}; who.fails=0; }
+      else if(d && d.error==="busy") who.err="잠시 후 다시 시도해 주세요";
+      else { who.err="등록되지 않은 번호예요. 선생님께 확인해 주세요"; if(++who.fails>=5){ who.lockUntil=Date.now()+60000; who.fails=0; } }
+      render(); },
+    ()=>{ who.busy=false; who.err="인터넷 연결을 확인하고 다시 눌러 주세요"; render(); });
+}
+function bindAuth(practice){
+  const sid=$("#sid");
+  if(sid){ sid.oninput=()=>{ const v=sid.value.replace(/\D/g,"").slice(0,6); if(sid.value!==v) sid.value=v; who.raw=v; if(who.err){ who.err=""; const m=$("#sid-msg"); if(m){ m.textContent="선생님께 받은 번호를 넣어 주세요"; m.classList.remove("errmsg"); } } };
+           sid.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); whoLookup(); } }; }
+  const sg=$("#sid-go"); if(sg) sg.onclick=whoLookup;
+  const wy=$("#who-yes"); if(wy) wy.onclick=()=>{ me={id:who.found.id, nm:who.found.nm, cls:who.found.cls}; store.set("me", me); who={raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0};
+      if(!clsFixed()) entry.cls = meCls() || entry.cls; if(!CONFIG.memberN.includes(prac.n)) prac.n=10; render(); };
+  const wn=$("#who-no"); if(wn) wn.onclick=()=>{ who.found=null; who.raw=""; render(); const x=$("#sid"); if(x) x.focus(); };
+  const mc=$("#me-change"); if(mc) mc.onclick=()=>{ me=null; store.set("me", null); who={raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0}; render(); const x=$("#sid"); if(x) x.focus(); };
+  const ag=$("#as-guest"); if(ag) ag.onclick=()=>{ me={guest:true, nm:""}; store.set("me", me); fixGuestPrac(); render(); const x=$("#gname"); if(x) x.focus(); };
+  const gn=$("#gname");
+  if(gn){ gn.oninput=()=>{ me={guest:true, nm:gn.value.trim().slice(0,20)}; store.set("me", me); const st=$("#start"); if(st){ const m=gateMsg(practice); st.disabled=!!m; st.textContent=m || "연습 시작"; } };
+          gn.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); tryStart(practice); } }; }
 }
 // 시작 버튼 — 반·이름이 맞아야 눌림. 이 기기에서 처음 쓰는 이름이면 한 번 확인받고 시작
 function gateMsg(practice){
+  if(AUTH){
+    if(!practice && !isMember()) return "일련번호를 먼저 확인하세요";
+    if(!practice && !CONFIG.classes[entry.cls]) return "반을 먼저 고르세요";
+    if(isMember()) return "";
+    if(isGuest()) return me.nm ? "" : "이름을 써 주세요";
+    return "일련번호를 확인하거나 원외생으로 들어오세요";
+  }
   if(!practice && !CONFIG.classes[entry.cls]) return "반을 먼저 고르세요";
   if(!entry.name) return nameMsg(entry.raw);
   return "";
 }
 function startArea(practice){
   const msg = gateMsg(practice);
-  if(entry.confirm && !msg) return `<section class="card confirmcard" role="alertdialog" aria-label="이름 확인">
+  if(!AUTH && entry.confirm && !msg) return `<section class="card confirmcard" role="alertdialog" aria-label="이름 확인">
       <span class="eyebrow">이름 확인</span>
       <div class="cf-name">${esc(entry.name)}${practice? "" : ` <span class="clschip2">${esc(entry.cls)}</span>`}</div>
       <p class="muted" style="margin:0;font-size:13px">퇴실증·선생님 기록·랭킹에 이 이름${practice?"":"과 반"}으로 남아요. 맞나요?</p>
@@ -1244,6 +1328,7 @@ function startArea(practice){
   return `<button class="btn" id="start" ${msg?"disabled":""}>${msg || (practice? "연습 시작" : "시작하기")}</button>`;
 }
 function bindStart(practice){
+  if(AUTH) bindAuth(practice);
   const ni=$("#name");
   const upd=()=>{ const st=$("#start"); if(!st) return; const m=gateMsg(practice); st.disabled=!!m; st.textContent=m || (practice? "연습 시작" : "시작하기"); };
   if(ni){
@@ -1257,6 +1342,7 @@ function bindStart(practice){
 }
 function tryStart(practice){
   if(gateMsg(practice)) return;
+  if(AUTH){ startQuiz(practice); return; }
   if(entry.name !== store.get("lastName", null) || (!practice && entry.cls !== store.get("lastCls", null))){ entry.confirm=true; render(); return; }
   startQuiz(practice);
 }
@@ -1270,7 +1356,7 @@ function bindEntry(){
 /* ───────── 화면: 혼자 연습 ───────── */
 function renderPractice(){
   const set=setById(prac.set), [sn, sc]=SUBJ[set.subj];
-  const hist = entry.name ? store.get("phist."+entry.name+"."+set.id, []) : [];
+  const hk = AUTH ? (isMember()? me.id : isGuest()&&me.nm? me.nm : null) : entry.name, hist = hk ? store.get("phist."+hk+"."+set.id, []) : [];
   const hasClass = preset.date===today();
   return `<div class="wrap">
     <section class="card setcard">
@@ -1281,24 +1367,25 @@ function renderPractice(){
     </section>
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><label for="psel">범위</label>
-        <select id="psel" class="pick">${menuList(x=>!x.soon && !x.teacherOnly).map(({menu:g, sets:gs})=>`<optgroup label="${esc(g)}">${gs.map(x=>`<option value="${x.id}" ${x.id===set.id?"selected":""}>${esc(mname(x))}</option>`).join("")}</optgroup>`).join("")}</select>
+        <select id="psel" class="pick">${menuList(x=>!x.soon && !x.teacherOnly).map(({menu:g, sets:gs})=>`<optgroup label="${esc(g)}">${gs.map(x=>{ const lock=isGuest() && !guestOk(x.id); return `<option value="${x.id}" ${x.id===set.id?"selected":""} ${lock?"disabled":""}>${lock?"🔒 ":""}${esc(mname(x))}${lock?" (원생 전용)":""}</option>`; }).join("")}</optgroup>`).join("")}</select>
       </div>
       <div class="field"><span class="lbl">문항 수</span>
-        <div class="seg" role="group" aria-label="문항 수">${[10,20,30].map(n=>`<button data-pn="${n}" aria-pressed="${n===prac.n}">${n}</button>`).join("")}</div>
+        <div class="seg" role="group" aria-label="문항 수">${nOpts().map(n=>`<button data-pn="${n}" aria-pressed="${n===prac.n}">${n}</button>`).join("")}</div>
       </div>
-      <div class="field"><label for="name">이름</label>
+      ${AUTH? authBlock(true) : `<div class="field"><label for="name">이름</label>
         <input id="name" class="nameinput" type="text" inputmode="text" autocomplete="name" maxlength="20" placeholder="성과 이름 (예: 김하늘)" value="${esc(entry.name||entry.raw||"")}">
-      </div>
+      </div>`}
       ${hist.length?`<div class="muted" style="font-size:13px">이 범위 지난 기록: 첫 시도 ${hist[hist.length-1].first}/${hist[hist.length-1].n}</div>`:""}
     </section>
     ${startArea(true)}
     <div class="linkrow"><button class="linkbtn" id="to-mine">내 기록 보기 →</button><button class="linkbtn" id="to-rank">🏆 연습 랭킹 →</button></div>
+    ${isGuest()? contactCard("원외생은 10문항 · 일부 범위만 풀 수 있어요. 전 범위가 궁금하다면") : ""}
     ${hasClass?`<div style="text-align:center"><button class="linkbtn" id="to-class">오늘 퇴실 퀴즈로 →</button></div>`:`<p class="muted" style="text-align:center;font-size:12px">수업 퇴실 퀴즈는 선생님이 띄운 QR로 들어오세요.</p>`}
   </div>`;
 }
 function bindPractice(){
-  $("#psel").onchange=e=>{ prac={...prac, set:e.target.value}; store.set("prac", prac); render(); };
-  document.querySelectorAll("[data-pn]").forEach(b=>b.onclick=()=>{ prac={...prac, n:+b.dataset.pn}; store.set("prac", prac); render(); });
+  $("#psel").onchange=e=>{ if(isGuest() && !guestOk(e.target.value)){ render(); return; } prac={...prac, set:e.target.value}; store.set("prac", prac); render(); };
+  document.querySelectorAll("[data-pn]").forEach(b=>b.onclick=()=>{ if(!nOpts().includes(+b.dataset.pn)) return; prac={...prac, n:+b.dataset.pn}; store.set("prac", prac); render(); });
   bindStart(true);
   const tc=$("#to-class"); if(tc) tc.onclick=()=>{ mode="class"; go("entry"); };
   $("#to-mine").onclick=()=>openMine("practice");
@@ -1307,14 +1394,16 @@ function bindPractice(){
 
 function clsBtn(c){ const k=(CONFIG.classKind||{})[c]; return k&&k!==c? `<span class="ck">${esc(k)}</span>${esc(c)}` : esc(c); }
 function startQuiz(practice){
-  if(!entry.name || gateMsg(practice)) return;
+  if(AUTH ? gateMsg(practice) : (!entry.name || gateMsg(practice))) return;
+  if(AUTH && practice) fixGuestPrac();
   if(!practice && clsFixed()) entry.cls = preset.c;
-  store.set("lastName", entry.name); if(!practice) store.set("lastCls", entry.cls);
+  if(!AUTH) store.set("lastName", entry.name); if(!practice) store.set("lastCls", entry.cls);
   const set=setById(practice? prac.set : preset.set);
   const nWant = practice? prac.n : preset.n;
-  const seed = hashStr(today()+"|"+set.id+"|"+entry.name+"|"+Date.now());
+  const disp = AUTH ? me.nm : entry.name, rid = AUTH ? (me.guest? me.nm : me.id) : entry.name;   // 화면엔 가린 이름, 기록엔 일련번호(원외생은 쓴 이름)
+  const seed = hashStr(today()+"|"+set.id+"|"+rid+"|"+Date.now());
   const plans = planSet(set, nWant, seed);
-  S = { set, practice:!!practice, cls: practice? "연습" : entry.cls, name:entry.name, n:plans.length, plans, seed,
+  S = { set, practice:!!practice, cls: practice? (isGuest()? "원외생" : "연습") : entry.cls, name:disp, rid, n:plans.length, plans, seed,
         round:1, queue:plans.map((_,i)=>i), pos:0, next:[], cleared:new Set(), firstOk:new Set(), firstWrong:[],
         streak:{}, tries:{}, startAt:Date.now(), done:false, q:null, sel:[] };
   loadQ(); go("quiz");
@@ -1414,11 +1503,11 @@ function finish(){
   S.done=true; S.endAt=Date.now();
   const date=today();
   const first=S.firstOk.size;
-  const histKey=(S.practice?"phist.":"hist.")+S.name+"."+S.set.id;
+  const histKey=(S.practice?"phist.":"hist.")+(S.rid||S.name)+"."+S.set.id;
   const hist=store.get(histKey, []);
   S.prev = hist.length? hist[hist.length-1] : null;
   hist.push({date, first, n:S.n}); store.set(histKey, hist.slice(-20));
-  const rec = { ts:new Date().toISOString(), hm:fmtTime(new Date()).slice(0,5), date, cls:S.cls, name:S.name, set:S.set.id, setName:(S.practice?"연습 · ":"")+setLabel(S.set), n:S.n, first,
+  const rec = { ts:new Date().toISOString(), hm:fmtTime(new Date()).slice(0,5), date, cls:S.cls, name:S.name, rid:S.rid||S.name, set:S.set.id, setName:(S.practice?"연습 · ":"")+setLabel(S.set), n:S.n, first,
     elapsed:S.endAt-S.startAt, rounds:S.round, wrong:S.firstWrong.map(i=>({id:itemId(S.set.id,S.plans[i].it), name:itemName(S.plans[i].it)})) };
   if(!S.practice){ const log=store.get("log", []); log.push(rec); store.set("log", log.slice(-500)); }
   { const my=store.get("mylog", []); my.push({ts:rec.ts, name:S.name, cls:S.cls, set:S.set.id, setName:setLabel(S.set), n:S.n, first, sec:Math.round(rec.elapsed/1000), rounds:S.round, wrong:rec.wrong, practice:!!S.practice}); store.set("mylog", my.slice(-500)); }
@@ -1431,7 +1520,7 @@ function submit(rec){
   if(!f.url) return false;
   try{
     const fd=new FormData();
-    fd.append(f.fields.name, rec.name); fd.append(f.fields.cls, rec.cls); fd.append(f.fields.set, rec.setName);
+    fd.append(f.fields.name, rec.rid||rec.name);   // 원생은 일련번호로 보냄 → Apps Script가 명단과 이어 이름으로 보여 줌 fd.append(f.fields.cls, rec.cls); fd.append(f.fields.set, rec.setName);
     fd.append(f.fields.first, rec.first+"/"+rec.n); fd.append(f.fields.time, Math.round(rec.elapsed/1000));
     fd.append(f.fields.wrong, rec.wrong.map(w=>w.id+" "+w.name).join(", "));
     if(f.fields.rounds) fd.append(f.fields.rounds, rec.rounds);
@@ -1505,6 +1594,7 @@ function renderResult(){
     <button class="btn" id="again-same">같은 범위 한 번 더</button>
     <button class="btn ghost" id="again">다른 범위 고르기</button>
     <div class="linkrow"><button class="linkbtn" id="to-mine">내 기록 보기 →</button><button class="linkbtn" id="to-rank">🏆 연습 랭킹 →</button></div>
+    ${S.cls==="원외생"? contactCard("전 범위·더 많은 문항으로 풀고 싶다면") : ""}
   </div>`;
 }
 function bindResult(){
@@ -1680,7 +1770,7 @@ function renderTeacher(){
     <div class="tgrid">
       <section class="card" style="display:flex;flex-direction:column;gap:14px">
         <div class="field"><span class="lbl">반</span><div class="seg" role="group" aria-label="반">${Object.keys(CONFIG.classes).map(c=>`<button data-tcls="${esc(c)}" aria-pressed="${c===tstate.cls}">${clsBtn(c)}</button>`).join("")}</div></div>
-        <div class="field"><span class="lbl">문항 수</span><div class="seg" role="group" aria-label="문항 수">${[10,15,20,30].map(n=>`<button data-tn="${n}" aria-pressed="${n===tstate.n}">${n}문항</button>`).join("")}</div></div>
+        <div class="field"><span class="lbl">문항 수</span><div class="seg" role="group" aria-label="문항 수">${[10,15,20,30,50].map(n=>`<button data-tn="${n}" aria-pressed="${n===tstate.n}">${n}문항</button>`).join("")}</div></div>
         <div class="field"><span class="lbl">범위 <span class="muted" style="font-weight:500">· 여러 개 고르면 같은 비율로 섞여요</span></span><div class="setlist">${setlist}</div></div>
       </section>
       <div style="display:flex;flex-direction:column;gap:14px">
