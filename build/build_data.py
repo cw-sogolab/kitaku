@@ -126,9 +126,9 @@ def build_jphis(d):
         yr_, ev, core, withc, gr = [x.text.strip() for x in r.cells]
         yr_ = yr_ or last; last = yr_
         ev = ev.replace('\n', ' ')
-        ev = re.sub(r'\s*\[~\s*\d{4}\]', '', ev)   # 「日清戦争 [~1895]」 같은 기간 표시는 떼고 시작 연도로
-        m = re.search(r'\[(발효|시행예정)\(?(\d{4})\)?\]', ev); eff = int(m.group(2)) if m else None
-        ev = re.sub(r'\s*\[(발효|시행예정)\(?\d{4}\)?\]\s*', '', ev).strip()
+        ev = re.sub(r'\s*\[\s*[~\-–]\s*\d{4}\s*\]', '', ev)   # 「日清戦争 [~1895]」 같은 기간 표시는 떼고 시작 연도로
+        m = re.search(r'\[(발효|시행예정)\s*\(?(\d{4})\)?\s*\]', ev); eff = int(m.group(2)) if m else None
+        ev = re.sub(r'\s*\[(발효|시행예정)\s*\(?\d{4}\)?\s*\]\s*', '', ev).strip()   # 2026-10-16: 「[발효 1890]」「[-1895]」 표기도 처리
         li = max((i for i, ch in enumerate(ev) if hang.match(ch)), default=-1)
         ko, ja = ev[:li+1].strip(), ev[li+1:].strip()
         if ja.startswith(')'): ko += ')'; ja = ja[1:].strip()
