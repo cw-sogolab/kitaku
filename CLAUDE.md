@@ -191,3 +191,4 @@ kitaku-quiz/
 - 세계 연표: 298개 그대로, 6개 사건명·핵심 문구 갱신.
 - 일본 연표: 161 → 221개. 자료집 표기가 「[발효 1890]」(띄어쓰기)·「[-1895]」(하이픈)으로 바뀌어 예전 파서가 연도를 이름에 남긴 채 걸러 버리던 문제 → build_jphis 정규식이 두 표기 모두 처리하도록 수정.
 - 연표 자료를 고칠 때마다 재빌드 필요(자동 반영 아님): `python3 build/build_data.py --jp <일본 자료집.docx> --db <EJU_연표DB.xlsx> --wg <세계지리 자료집.docx>`.
+- 푸시 메모(2026-10-16): 일반 `git push` 가 리다이렉트에서 인증을 잃고 실패(could not read Username) → 원격 주소 끝에 `/`를 붙이고 `http.extraHeader` 로 Basic 인증을 넣어 `git push https://github.com/cw-sogolab/kitaku.git/ HEAD:main` 하면 됨(토큰은 출력하지 말 것).
