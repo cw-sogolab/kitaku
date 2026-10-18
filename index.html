@@ -1521,7 +1521,8 @@ function submit(rec){
   if(!f.url) return false;
   try{
     const fd=new FormData();
-    fd.append(f.fields.name, rec.rid||rec.name);   // 원생은 일련번호로 보냄 → Apps Script가 명단과 이어 이름으로 보여 줌 fd.append(f.fields.cls, rec.cls); fd.append(f.fields.set, rec.setName);
+    // 원생은 일련번호로 보냄 → Apps Script가 명단과 이어 이름으로 보여 줌
+    fd.append(f.fields.name, rec.rid||rec.name); fd.append(f.fields.cls, rec.cls); fd.append(f.fields.set, rec.setName);
     fd.append(f.fields.first, rec.first+"/"+rec.n); fd.append(f.fields.time, Math.round(rec.elapsed/1000));
     fd.append(f.fields.wrong, rec.wrong.map(w=>w.id+" "+w.name).join(", "));
     if(f.fields.rounds) fd.append(f.fields.rounds, rec.rounds);
