@@ -438,10 +438,12 @@ if(DEV){ document.title = "[개발판] " + document.title;
   const m=document.createElement("meta"); m.name="robots"; m.content="noindex"; document.head.appendChild(m); }
 
 /* ───────── 설정 (배포 때 여기만 고치면 됨) ───────── */
+const SERIAL_FROM = "2026-11-09";   // 본판 일련번호 입장 시작일 (이 날짜 0시부터, 기기 시각 기준)
+const SERIAL_ON = (()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); })() >= SERIAL_FROM;
 const CONFIG = {
   defaultN: 20,
   // 일련번호 입장 (2026-10-16): "serial" = 일련번호(원생) / 원외생, "name" = 예전처럼 이름 입력. 개발판에서 먼저 켜고 확인 후 본판도 "serial"
-  auth: DEV ? "serial" : "name",
+  auth: (DEV || SERIAL_ON) ? "serial" : "name",   // 본판은 SERIAL_FROM 날짜부터 자동으로 일련번호 입장 (2026-10-21 사용자 결정 — 그날 따로 손대지 않게)
   contactUrl: "https://open.kakao.com/o/sFh5or9h",   // 원외생 「수업 문의하기」 → 선생님 오픈채팅 프로필
   memberN: [10, 15, 20, 30],                          // 원생 혼자 연습 문항 수 (2026-10-17: 연습은 30까지)
   guestN: 10,                                         // 원외생은 10문항 고정
@@ -1204,7 +1206,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-10-21a";
+const APP_V = "2026-10-21b";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
@@ -1214,6 +1216,11 @@ function reloadNew(){
 }
 async function checkV(){
   if(document.hidden || newV) return;
+  if(CONFIG.auth!=="serial" && today()>=SERIAL_FROM){   // 시작일 0시가 지나도록 열려 있던 이름 입력 화면 → 새로고침해서 일련번호로
+    let tried=null; try{ tried=sessionStorage.getItem(SK+"updTried"); }catch(e){}
+    if(tried!=="serial-"+SERIAL_FROM){ newV="serial-"+SERIAL_FROM; if(safeView(view)) reloadNew(); }
+    return;
+  }
   try{
     const r=await fetch(location.pathname+"?_chk="+Date.now(), {cache:"no-store"});
     if(!r.ok) return;

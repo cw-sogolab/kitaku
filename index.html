@@ -438,10 +438,12 @@ if(DEV){ document.title = "[개발판] " + document.title;
   const m=document.createElement("meta"); m.name="robots"; m.content="noindex"; document.head.appendChild(m); }
 
 /* ───────── 설정 (배포 때 여기만 고치면 됨) ───────── */
+const SERIAL_FROM = "2026-11-09";   // 본판 일련번호 입장 시작일 (이 날짜 0시부터, 기기 시각 기준)
+const SERIAL_ON = (()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); })() >= SERIAL_FROM;
 const CONFIG = {
   defaultN: 20,
   // 일련번호 입장 (2026-10-16): "serial" = 일련번호(원생) / 원외생, "name" = 예전처럼 이름 입력. 개발판에서 먼저 켜고 확인 후 본판도 "serial"
-  auth: DEV ? "serial" : "name",
+  auth: (DEV || SERIAL_ON) ? "serial" : "name",   // 본판은 SERIAL_FROM 날짜부터 자동으로 일련번호 입장 (2026-10-21 사용자 결정 — 그날 따로 손대지 않게)
   contactUrl: "https://open.kakao.com/o/sFh5or9h",   // 원외생 「수업 문의하기」 → 선생님 오픈채팅 프로필
   memberN: [10, 15, 20, 30],                          // 원생 혼자 연습 문항 수 (2026-10-17: 연습은 30까지)
   guestN: 10,                                         // 원외생은 10문항 고정
@@ -1175,6 +1177,8 @@ let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:null, date:""
 if(params.get("set")){ preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||null, date:today()}; store.set("preset2", preset); }   // QR에 반이 없으면 학생이 고름
 // QR(주소에 set=)로 들어왔거나 오늘 받은 세트가 있으면 수업 모드, 아니면 혼자 연습 모드
 let mode = (params.get("set") || preset.date===today()) ? "class" : "practice";
+if(params.has("_v")){ params.delete("_v"); const q=params.toString(); history.replaceState(null, "", location.pathname+(q?"?"+q:"")+location.hash); }   // 자동 새로고침 때 붙인 표시 지우기
+try{ const um=sessionStorage.getItem(SK+"updMode"); if(um){ sessionStorage.removeItem(SK+"updMode"); if(um==="class"||um==="practice") mode=um; } }catch(e){}   // 새로고침 전 화면(수업/연습) 그대로
 let prac = store.get("prac", {set:"jp-region", n:10});
 preset.set = okSet(preset.set); prac.set = okPrac(prac.set);
 const home = () => mode==="class" ? "entry" : "practice";
@@ -1198,8 +1202,42 @@ function fixGuestPrac(){ if(!isGuest()) return; if(!guestOk(prac.set)) prac.set=
 fixGuestPrac();
 if(AUTH && !nOpts().includes(prac.n)) prac.n = 10;
 let clockTimer = null, advTimer = null, lockTimer = null;
+/* ── 새 버전 자동 새로고침 (2026-10-21) ──
+   서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
+   첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
+   확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
+const APP_V = "2026-10-21b";
+let newV = null;
+const safeView = v => v==="entry" || v==="practice";
+function reloadNew(){
+  try{ sessionStorage.setItem(SK+"updTried", newV); sessionStorage.setItem(SK+"updMode", mode); }catch(e){}
+  const p=new URLSearchParams(location.search); p.set("_v", newV);
+  location.replace(location.pathname+"?"+p.toString()+location.hash);
+}
+async function checkV(){
+  if(document.hidden || newV) return;
+  if(CONFIG.auth!=="serial" && today()>=SERIAL_FROM){   // 시작일 0시가 지나도록 열려 있던 이름 입력 화면 → 새로고침해서 일련번호로
+    let tried=null; try{ tried=sessionStorage.getItem(SK+"updTried"); }catch(e){}
+    if(tried!=="serial-"+SERIAL_FROM){ newV="serial-"+SERIAL_FROM; if(safeView(view)) reloadNew(); }
+    return;
+  }
+  try{
+    const r=await fetch(location.pathname+"?_chk="+Date.now(), {cache:"no-store"});
+    if(!r.ok) return;
+    const m=(await r.text()).match(/const APP_V = "([^"]+)"/);
+    if(!m || m[1]===APP_V) return;
+    let tried=null; try{ tried=sessionStorage.getItem(SK+"updTried"); }catch(e){}
+    if(tried===m[1]) return;   // 한 번 새로고침했는데도 옛 화면이면 다시 안 함 (무한 새로고침 방지)
+    newV=m[1];
+    if(safeView(view)) reloadNew();
+  }catch(e){}
+}
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) checkV(); });
+window.addEventListener("pageshow", e=>{ if(e.persisted) checkV(); });
+setInterval(checkV, 5*60*1000);
+setTimeout(checkV, 3000);
 
-function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
+function go(v){ if(newV && safeView(v)){ view=v; reloadNew(); return; } view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
 $("#logo").onclick = e=>{ e.preventDefault();
   if(S && !S.done && (view==="quiz" || view==="lap") && !confirm("처음 화면으로 갈까요? 풀던 퀴즈는 처음부터 다시 풀어야 해요.")) return;
   if(location.hash) history.replaceState(null, "", location.pathname+location.search);
