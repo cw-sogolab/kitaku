@@ -15,6 +15,10 @@
  * 원생명단: 선생님 드라이브의 별도 구글 시트 「帰宅クイズ 원생명단」(공유하지 않음). 첫 시트 1행 머리글: 일련번호 · 이름 · 퀴즈반 · … · 상태
  *   한 번이라도 수업을 들은 원생은 지금 반·재원 여부와 상관없이 계속 이용 (2026-10-17 사용자 결정). 막아야 할 때만 상태를 「차단」으로. 행은 지우지 말 것.
  *   기록 시트의 이름 칸에는 원생이면 일련번호(영문 2 + 숫자 6)가 들어옴 → 학생 분석(KEY)에서는 명단의 전체 이름으로 바꿔서 보여 줌.
+ *
+ * 시트에 이름으로 바꿔 적기 (2026-10-21 사용자 요청 — 선생님이 시트에서 바로 보게):
+ *   폼으로는 일련번호만 오고(공개 사이트에 실명이 오가지 않게), 기록이 시트에 들어오는 순간 이 스크립트가 명단 이름으로 바꿔 적음.
+ *   처음 한 번만: 편집기 위쪽 함수 목록에서 setupNameTrigger 고르고 ▶ 실행 → 권한 허용 / 이어서 fillNamesNow ▶ 실행(이미 들어온 번호도 이름으로).
  */
 const KEY = "여기에-비밀-키";            // 실제 키는 저장소에 올리지 말 것
 const ROSTER_ID = "여기에-명단-시트-ID";   // 원생명단 시트 주소의 /d/ 와 /edit 사이 값. 저장소에 올리지 말 것
@@ -57,9 +61,9 @@ function clsCol_(head) { const i = head.findIndex((h, k) => k > 0 && /^반|반$|
 
 /* ── 원생명단 ── */
 function roster_() {
-  const cache = CacheService.getScriptCache(), hit = cache.get("roster");
+  const cache = CacheService.getScriptCache(), hit = cache.get("roster2");
   if (hit) return JSON.parse(hit);
-  const R = { ids: {}, base: {} };
+  const R = { ids: {}, base: {}, full: {} };
   if (!ROSTER_ID || /여기에/.test(ROSTER_ID)) return R;
   const vals = SpreadsheetApp.openById(ROSTER_ID).getSheets()[0].getDataRange().getValues();
   const head = vals.shift().map(h => String(h).trim());
@@ -71,8 +75,9 @@ function roster_() {
     const st = String(r[C.st] || "").trim();
     R.ids[id] = { name: name, out: st === "차단" };
     const b = base_(name); (R.base[b] = R.base[b] || []).push(id);   // 예전 기록(이름만 있는 것) 연결용
+    R.full[name.replace(/\s+/g, "")] = id;                               // 시트에 명단 이름 그대로 적힌 기록(김지원(동두천) 등) 연결용
   });
-  cache.put("roster", JSON.stringify(R), 300);   // 5분 캐시 — 명단을 고치면 5분 안에 반영
+  cache.put("roster2", JSON.stringify(R), 300);   // 5분 캐시 — 명단을 고치면 5분 안에 반영
   return R;
 }
 function base_(name) { return String(name).replace(/\(.*?\)/g, "").replace(/\s+/g, ""); }
@@ -85,6 +90,8 @@ function mask_(name) {
 function match_(R, v) {   // 일련번호 → 명단 / 예전 이름 → 같은 이름이 명단에 하나뿐이면 그 학생
   const s = String(v || "").trim(), sn = sidNorm_(s);
   if (SID_RE.test(sn)) return R.ids[sn] ? Object.assign({ id: sn }, R.ids[sn]) : null;
+  const fid = R.full && R.full[s.replace(/\s+/g, "")];
+  if (fid) return Object.assign({ id: fid }, R.ids[fid]);
   const ids = R.base[base_(s)];
   return ids && ids.length === 1 ? Object.assign({ id: ids[0] }, R.ids[ids[0]]) : null;
 }
@@ -151,6 +158,38 @@ function rank_() {
   });
   cache.put(CK, JSON.stringify(out), 60);    // 1분 캐시
   return out;
+}
+
+/* ── 시트 이름 칸: 일련번호 → 명단 이름 (2026-10-21) ── */
+function kitakuOnSubmit(e) {   // 폼 기록이 들어올 때마다 (setupNameTrigger 로 연결)
+  if (!e || !e.range) return;
+  const sh = e.range.getSheet(), row = e.range.getRow();
+  nameRow_(sh, row, sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String), roster_());
+}
+function nameRow_(sh, row, head, R) {
+  const ni = nameCol_(head), ci = clsCol_(head);
+  const v = sh.getRange(row, ni + 1).getValue(), cls = String(sh.getRange(row, ci + 1).getValue() || "").trim();
+  const sn = sidNorm_(v);
+  if (cls === GUEST_CLS || !SID_RE.test(sn) || !R.ids[sn]) return false;   // 원외생·명단에 없는 번호는 그대로
+  sh.getRange(row, ni + 1).setValue(R.ids[sn].name);
+  return true;
+}
+function fillNamesNow() {   // 이미 들어온 번호도 한꺼번에 이름으로 (한 번만 실행)
+  CacheService.getScriptCache().remove("roster2");
+  const sh = sheet_(), vals = sh.getDataRange().getValues(), head = vals[0].map(String), R = roster_();
+  const ni = nameCol_(head), ci = clsCol_(head);
+  let n = 0;
+  for (let i = 1; i < vals.length; i++) {
+    const sn = sidNorm_(vals[i][ni]);
+    if (String(vals[i][ci] || "").trim() === GUEST_CLS || !SID_RE.test(sn) || !R.ids[sn]) continue;
+    sh.getRange(i + 1, ni + 1).setValue(R.ids[sn].name); n++;
+  }
+  Logger.log(n + "행을 이름으로 바꿈");
+}
+function setupNameTrigger() {   // 한 번만 실행: 폼 제출 때 kitakuOnSubmit 이 돌게 연결
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === "kitakuOnSubmit").forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger("kitakuOnSubmit").forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onFormSubmit().create();
+  Logger.log("연결 완료");
 }
 
 function out_(obj, cb) {
