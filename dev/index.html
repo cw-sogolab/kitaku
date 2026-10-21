@@ -1175,6 +1175,8 @@ let preset = store.get("preset2", {set:"all", n:CONFIG.defaultN, c:null, date:""
 if(params.get("set")){ preset = {set:params.get("set"), n:+params.get("n")||CONFIG.defaultN, c:params.get("c")||null, date:today()}; store.set("preset2", preset); }   // QR에 반이 없으면 학생이 고름
 // QR(주소에 set=)로 들어왔거나 오늘 받은 세트가 있으면 수업 모드, 아니면 혼자 연습 모드
 let mode = (params.get("set") || preset.date===today()) ? "class" : "practice";
+if(params.has("_v")){ params.delete("_v"); const q=params.toString(); history.replaceState(null, "", location.pathname+(q?"?"+q:"")+location.hash); }   // 자동 새로고침 때 붙인 표시 지우기
+try{ const um=sessionStorage.getItem(SK+"updMode"); if(um){ sessionStorage.removeItem(SK+"updMode"); if(um==="class"||um==="practice") mode=um; } }catch(e){}   // 새로고침 전 화면(수업/연습) 그대로
 let prac = store.get("prac", {set:"jp-region", n:10});
 preset.set = okSet(preset.set); prac.set = okPrac(prac.set);
 const home = () => mode==="class" ? "entry" : "practice";
@@ -1198,8 +1200,37 @@ function fixGuestPrac(){ if(!isGuest()) return; if(!guestOk(prac.set)) prac.set=
 fixGuestPrac();
 if(AUTH && !nOpts().includes(prac.n)) prac.n = 10;
 let clockTimer = null, advTimer = null, lockTimer = null;
+/* ── 새 버전 자동 새로고침 (2026-10-21) ──
+   서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
+   첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
+   확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
+const APP_V = "2026-10-21a";
+let newV = null;
+const safeView = v => v==="entry" || v==="practice";
+function reloadNew(){
+  try{ sessionStorage.setItem(SK+"updTried", newV); sessionStorage.setItem(SK+"updMode", mode); }catch(e){}
+  const p=new URLSearchParams(location.search); p.set("_v", newV);
+  location.replace(location.pathname+"?"+p.toString()+location.hash);
+}
+async function checkV(){
+  if(document.hidden || newV) return;
+  try{
+    const r=await fetch(location.pathname+"?_chk="+Date.now(), {cache:"no-store"});
+    if(!r.ok) return;
+    const m=(await r.text()).match(/const APP_V = "([^"]+)"/);
+    if(!m || m[1]===APP_V) return;
+    let tried=null; try{ tried=sessionStorage.getItem(SK+"updTried"); }catch(e){}
+    if(tried===m[1]) return;   // 한 번 새로고침했는데도 옛 화면이면 다시 안 함 (무한 새로고침 방지)
+    newV=m[1];
+    if(safeView(view)) reloadNew();
+  }catch(e){}
+}
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) checkV(); });
+window.addEventListener("pageshow", e=>{ if(e.persisted) checkV(); });
+setInterval(checkV, 5*60*1000);
+setTimeout(checkV, 3000);
 
-function go(v){ view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
+function go(v){ if(newV && safeView(v)){ view=v; reloadNew(); return; } view=v; clearInterval(clockTimer); clearTimeout(advTimer); clearInterval(lockTimer); render(); window.scrollTo({top:0}); }
 $("#logo").onclick = e=>{ e.preventDefault();
   if(S && !S.done && (view==="quiz" || view==="lap") && !confirm("처음 화면으로 갈까요? 풀던 퀴즈는 처음부터 다시 풀어야 해요.")) return;
   if(location.hash) history.replaceState(null, "", location.pathname+location.search);
