@@ -438,7 +438,7 @@ if(DEV){ document.title = "[개발판] " + document.title;
   const m=document.createElement("meta"); m.name="robots"; m.content="noindex"; document.head.appendChild(m); }
 
 /* ───────── 설정 (배포 때 여기만 고치면 됨) ───────── */
-const SERIAL_FROM = "2026-11-09";   // 본판 일련번호 입장 시작일 (이 날짜 0시부터, 기기 시각 기준)
+const SERIAL_FROM = "2026-10-21";   // 본판 일련번호 입장 시작일 (이 날짜 0시부터, 기기 시각 기준)
 const SERIAL_ON = (()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); })() >= SERIAL_FROM;
 const CONFIG = {
   defaultN: 20,
@@ -1206,7 +1206,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-10-21b";
+const APP_V = "2026-10-21c";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
