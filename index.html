@@ -1110,7 +1110,7 @@ const BUILD = {
     if(picked.length<3) return BUILD.eventToYear(e, r, pool);
     const items = shuffle(picked, r);
     const correctOrder = items.map((x,i)=>i).sort((a,b)=>items[a].y-items[b].y);
-    return {tag:"순서 배열", order:true, prompt:"오래된 것부터 차례로 누르세요", choices:items.map(x=>({main:x.ko, sub:x.ja, y:x.y})), correctOrder,
+    return {tag:"순서 배열", order:true, prompt:"오래된 것부터 차례로 누르세요", orderHint:true, choices:items.map(x=>({main:x.ko, sub:x.ja, y:x.y})), correctOrder,
       explain: chronoExplain(items, e)};
   },
 
@@ -1206,7 +1206,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-10-21c";
+const APP_V = "2026-10-24a";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
@@ -1470,7 +1470,7 @@ function renderQuiz(){
   if(q.order){
     choices = q.choices.map((c,i)=>{ const o=S.sel.indexOf(i);
       let cls="choice"; if(S.answered){ cls += q.correctOrder[o]===i? " right":" wrong"; }
-      return `<button class="${cls}" data-i="${i}" ${S.answered||o>=0?"disabled":""}><span class="t"><span class="main">${esc(c.main)}</span><span class="sub">${esc(c.sub)}</span></span>${S.answered?`<span class="yr">${c.y}</span>`:""}<span class="ord${o<0?" empty":""}">${o<0?"":o+1}</span></button>`; }).join("");
+      return `<button class="${cls}" data-i="${i}" ${S.answered?"disabled":""}><span class="t"><span class="main">${esc(c.main)}</span><span class="sub">${esc(c.sub)}</span></span>${S.answered?`<span class="yr">${c.y}</span>`:""}<span class="ord${o<0?" empty":""}">${o<0?"":o+1}</span></button>`; }).join("");
   } else {
     choices = q.choices.map((c,i)=>{ let cls="choice"+(c.year||c.mono?" year":"");
       if(S.answered){ if(i===q.answer) cls+=" right"; else if(S.sel[0]===i) cls+=" wrong"; else cls+=" dim"; }
@@ -1488,7 +1488,7 @@ function renderQuiz(){
     ${railHTML()}
     <section class="card q">
       <div class="qtag"><span class="chip" style="--c:${sc}">${esc(qs.group)}${S.set.composite&&qs.id.startsWith("w-")?" · "+esc(qs.name):""}</span><span>${esc(q.tag)}</span></div>
-      <div class="prompt">${q.prompt}${q.subPrompt?`<span style="display:block;font-size:16px;margin-top:6px">${q.subPrompt}</span>`:""}</div>
+      <div class="prompt">${q.prompt}${q.subPrompt?`<span style="display:block;font-size:16px;margin-top:6px">${q.subPrompt}</span>`:""}${q.orderHint&&!S.answered?`<span class="muted" style="display:block;font-size:13px;font-weight:500;margin-top:6px">잘못 눌렀으면 다시 누르면 취소돼요</span>`:""}</div>
       ${showMap?`<div class="mapbox">${mapSVG(mapIds,{ring:q.ring})}</div>`:""}
       ${q.svg?`<div class="mapbox">${S.answered && q.svgAfter? q.svgAfter : q.svg}</div>`:""}${S.answered && q.svgAfter && !q.svg?`<div class="mapbox">${q.svgAfter}</div>`:""}
       <div class="choices${(showMap||q.svg) && !q.order && q.choices.every(c=>String(c.main).length<=8) ? " grid2":""}">${choices}</div>
@@ -1504,7 +1504,8 @@ function bindQuiz(){
 function choose(i){
   if(S.answered) return;
   const q=S.q;
-  if(q.order){ if(S.sel.includes(i)) return; S.sel.push(i); if(S.sel.length<q.choices.length){ render(); return; } }
+  if(q.order){ const at=S.sel.indexOf(i); if(at>=0){ S.sel.splice(at,1); render(); return; }   // 고른 것을 다시 누르면 취소 (2026-10-24)
+    S.sel.push(i); if(S.sel.length<q.choices.length){ render(); return; } }
   else S.sel=[i];
   const ok = q.order ? S.sel.every((v,k)=>v===q.correctOrder[k]) : i===q.answer;
   const idx=S.queue[S.pos];
