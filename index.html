@@ -452,7 +452,7 @@ const CONFIG = {
   plannedBase: "https://cw-sogolab.github.io/kitaku/",
   statsUrl: "https://script.google.com/macros/s/AKfycbytdU_JiEpriYaMUKX3H9mpm0TjdFJ29Nu-zDm1QGyUQ7SWRdYahyf2_FujMYDMzZ08/exec",                    // 학생 분석: Apps Script 웹 앱 URL (비워 두면 강사 화면에서 입력). 비밀 키는 여기 넣지 말 것
   secret: "kitaku-2026",
-  teacherPinHash: 189797738,       // 강사 화면 PIN의 hashStr 값 (초기 PIN 7350). 바꾸려면 콘솔에서 hashStr("새PIN") 실행 후 여기 붙여넣기
+  teacherPinHash: 189797738,       // 강사 화면 PIN의 hashStr 값. 바꾸려면 콘솔에서 hashStr("새PIN") 실행 후 여기 붙여넣기
   classes: { "토일반": [], "화목반": [], "개념반": [], "단풀반": [] },   // 반 이름 (학생 이름은 본인이 입력) — 시트·랭킹에 이 이름 그대로 찍힘
   classKind: { "토일반":"실전반", "화목반":"실전반", "개념반":"개념반", "단풀반":"단풀반" },   // 반 버튼 위 작은 글씨
   form: {                          // 구글 폼 「帰宅クイズ 기록」 (비우면 이 기기에만 저장)
@@ -1183,6 +1183,7 @@ let prac = store.get("prac", {set:"jp-region", n:10});
 preset.set = okSet(preset.set); prac.set = okPrac(prac.set);
 const home = () => mode==="class" ? "entry" : "practice";
 let S = null;         // 퀴즈 진행 상태
+const pinHash = ()=>store.get("pinh", CONFIG.teacherPinHash);   // 강사 화면에서 바꾼 PIN(이 기기)이 있으면 그것, 없으면 CONFIG 값
 const tUnlocked = ()=>{ try{ return sessionStorage.getItem(SK+"t")==="1"; }catch(e){ return false; } };
 let view = location.hash==="#teacher" ? (tUnlocked() ? "teacher" : "pin") : home();
 const clsFixed = ()=> !!CONFIG.classes[preset.c];   // QR(강사 설정)에 반이 들어 있으면 학생은 반을 고르지 않음
@@ -1252,7 +1253,7 @@ function renderPin(){
     <section class="card" style="display:flex;flex-direction:column;gap:12px">
       <span class="eyebrow">강사 화면</span>
       <h1 style="font-size:22px">PIN을 입력하세요</h1>
-      <div class="field"><label for="pin">강사 PIN</label><input id="pin" class="pick" type="password" inputmode="numeric" autocomplete="off" maxlength="12" autofocus></div>
+      <div class="field"><label for="pin">강사 PIN</label><input id="pin" class="pick" type="password" autocomplete="off" maxlength="30" autofocus></div>
       <div class="muted" id="pin-msg" style="font-size:13px;min-height:1.2em"></div>
       <button class="btn primary" id="pin-go">열기</button>
       <button class="btn ghost" id="pin-back">학생 화면으로</button>
@@ -1262,7 +1263,7 @@ function renderPin(){
 function bindPin(){
   const inp=$("#pin"), msg=$("#pin-msg");
   const tryPin=()=>{
-    if(hashStr(inp.value.trim())===CONFIG.teacherPinHash){ try{ sessionStorage.setItem(SK+"t","1"); }catch(e){} $("#nav-teacher").hidden=false; go("teacher"); }
+    if(hashStr(inp.value.trim())===pinHash()){ try{ sessionStorage.setItem(SK+"t","1"); }catch(e){} $("#nav-teacher").hidden=false; go("teacher"); }
     else { msg.textContent="PIN이 달라요."; inp.value=""; inp.focus(); }
   };
   $("#pin-go").onclick=tryPin;
@@ -1830,6 +1831,13 @@ function renderTeacher(){
           ${log.length? `<div class="tbl"><table><thead><tr><th>시각</th><th>이름</th><th>반</th><th>세트</th><th>첫 시도</th><th>시도</th><th>시간</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">아직 기록이 없어요. 학생 화면에서 한 세트를 끝까지 풀어보세요.</div>`}
           ${worst.length? `<div class="field"><span class="lbl">첫 시도에 많이 틀린 문항</span><div class="worst">${worst.map(w=>`<div><span>${esc(w.name)}</span><span class="c">${w.c}명</span></div>`).join("")}</div></div>`:""}
         </section>
+        <section class="card" style="display:flex;flex-direction:column;gap:10px">
+          <h2 style="font-size:16px">강사 PIN 바꾸기</h2>
+          <div class="note">숫자·영문·기호 아무거나, 4~30자. 이 기기에서만 적용돼요 (다른 기기는 기존 PIN 그대로).</div>
+          <div class="field"><input id="pin-new" class="pick" type="password" autocomplete="new-password" maxlength="30" placeholder="새 PIN"></div>
+          <div class="muted" id="pin-new-msg" style="font-size:13px;min-height:1.2em"></div>
+          <button class="btn ghost" id="pin-new-go">바꾸기</button>
+        </section>
       </div>
     </div>
   </div>`;
@@ -1844,6 +1852,9 @@ function bindTeacher(){
     if(!sel.length){ x.checked=true; return; }                                   // 최소 하나는 남김
     const order = SETS.map(s=>s.id); sel.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
     tstate.set = sel.join(","); render(); });
+  $("#pin-new-go").onclick=()=>{ const v=$("#pin-new").value.trim(), m=$("#pin-new-msg");
+    if(v.length<4){ m.textContent="4자 이상으로 해 주세요."; return; }
+    store.set("pinh", hashStr(v)); $("#pin-new").value=""; m.textContent="바뀌었어요. 다음 입장부터 새 PIN으로 들어가요."; };
   $("#clear-local").onclick=()=>{ if(!confirm("이 기기에 저장된 풀이 기록(오늘 퇴실 기록·지난 점수)을 모두 지울까요? 시트 기록은 그대로예요.")) return;
     try{ Object.keys(localStorage).filter(k=>k.startsWith(SK) && /^(log|mylog|hist\.|phist\.)/.test(k.slice(SK.length))).forEach(k=>localStorage.removeItem(k)); }catch(e){} render(); };
   $("#preview").onclick=()=>{ preset={...tstate, date:today()}; store.set("preset2", preset); mode="class"; entry={cls:tstate.cls, name:null}; S=null; go("entry"); };
