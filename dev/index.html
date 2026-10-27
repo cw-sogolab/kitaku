@@ -1101,7 +1101,9 @@ const BUILD = {
     const add=y=>{ if(y && !ys.has(y) && w.length<3){ ys.add(y); w.push(y); } };
     add(e.y); add(e.eff+1); add(e.eff-2); add(e.y-1);
     const c=mk(e.eff, w, r, y=>({main:String(y), year:true}));
-    return {...c, tag:"채택 ↔ 발효", prompt:`<span class="big">${esc(e.ko)}</span><span class="jaline">${esc(e.ja)}</span>`, subPrompt:"발효·시행된 해는?", explain:chronoExplain([e], e)};
+    const bare=(t,re)=>t.replace(re,"");   // 「채택」이 붙은 채로 발효 연도를 물으면 헷갈리므로 동작 낱말을 뗌
+    const ko=bare(e.ko,/\s*(채택|체결|설립|결성|제정|발포|공포|성립|신설)$/), ja=bare(e.ja,/(採択|締結|設立|結成|制定|発布|公布|成立|設置)$/);
+    return {...c, tag:"채택 ↔ 발효", prompt:`<span class="big">${esc(ko)}</span><span class="jaline">${esc(ja)}</span>`, subPrompt:"발효·시행된 해는?", explain:chronoExplain([e], e)};
   },
   order(e, r, pool){
     const near = shuffle(pool.filter(x=>x!==e && Math.abs(x.y-e.y)>=2 && Math.abs(x.y-e.y)<=40 && x.ko!==e.ko), r);
@@ -1207,7 +1209,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-10-24a";
+const APP_V = "2026-10-27a";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
