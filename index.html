@@ -421,7 +421,7 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 <main id="app" aria-live="polite"></main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="data.js?v=65477f5e"></script>
+<script src="data.js?v=b6a6d87f"></script>
 <script>
 (function(){
 "use strict";
@@ -1080,7 +1080,7 @@ const BUILD = {
 
   /* ── 연표 (한국어) ── */
   yearToEvent(e, r, pool){
-    const cands = pool.filter(x=>x.y!==e.y && Math.abs(x.y-e.y)<=25 && x.ko!==e.ko);
+    const cands = pool.filter(x=>x.y!==e.y && x.eff!==e.y && Math.abs(x.y-e.y)<=25 && x.ko!==e.ko);   // 발효가 그 해인 사건도 「그 해에 있었던 일」로 읽힐 수 있어 보기에서 뺌
     const sameType = shuffle(cands.filter(x=>x.t===e.t), r), rest=shuffle(cands, r);
     const w=[]; for(const x of [...sameType,...rest]){ if(w.length>=3) break; if(!w.includes(x) && !w.some(z=>z.ko===x.ko)) w.push(x); }
     const c=mk(e, w, r, x=>({main:x.ko, sub:x.ja}));
@@ -1102,7 +1102,7 @@ const BUILD = {
     add(e.y); add(e.eff+1); add(e.eff-2); add(e.y-1);
     const c=mk(e.eff, w, r, y=>({main:String(y), year:true}));
     const bare=(t,re)=>t.replace(re,"");   // 「채택」이 붙은 채로 발효 연도를 물으면 헷갈리므로 동작 낱말을 뗌
-    const ko=bare(e.ko,/\s*(채택|체결|설립|결성|제정|발포|공포|성립|신설)$/), ja=bare(e.ja,/(採択|締結|設立|結成|制定|発布|公布|成立|設置)$/);
+    const ko=bare(e.ko,/\s*(채택|체결|설립|결성|제정|발포|공포|성립|신설|개정)$/), ja=bare(e.ja,/(採択|締結|設立|結成|制定|発布|公布|成立|設置)$/);
     return {...c, tag:"채택 ↔ 발효", prompt:`<span class="big">${esc(ko)}</span><span class="jaline">${esc(ja)}</span>`, subPrompt:"발효·시행된 해는?", explain:chronoExplain([e], e)};
   },
   order(e, r, pool){
@@ -1209,7 +1209,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-10-27a";
+const APP_V = "2026-10-30a";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
