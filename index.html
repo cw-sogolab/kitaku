@@ -1209,7 +1209,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-10-27a";
+const APP_V = "2026-11-06a";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
@@ -2108,6 +2108,23 @@ document.addEventListener("keydown",e=>{
   else if(S.answered && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); advance(); }
 });
 render();
+/* 공지 팝업 (이미지) — 한 번 닫으면 이 폰에서는 다시 안 뜸.
+   새 공지를 띄울 땐 NOTICE.id 를 바꾸면 모두에게 다시 한 번 뜬다. 내릴 땐 NOTICE.img 를 ""로. */
+const NOTICE = { id:"2026-11-08-pause", img:"notice.png", alt:"공지: 11월 8일 오후 3시 이후 사이트 운영 중단, 12월 중 재오픈" };
+(function(){
+  if(!NOTICE.img) return;
+  const key = SK+"notice."+NOTICE.id;
+  try{ if(localStorage.getItem(key)) return; }catch(e){}
+  const ov = document.createElement("div");
+  ov.setAttribute("role","dialog"); ov.setAttribute("aria-modal","true");
+  ov.style.cssText="position:fixed;inset:0;z-index:9999;background:rgba(30,20,60,.55);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer";
+  const im = new Image(); im.src = NOTICE.img; im.alt = NOTICE.alt;
+  im.style.cssText="max-width:min(100%,400px);max-height:100%;filter:drop-shadow(0 16px 36px rgba(0,0,0,.35))";
+  ov.appendChild(im);
+  const close = ()=>{ try{ localStorage.setItem(key,"1"); }catch(e){} ov.remove(); };
+  ov.addEventListener("click", close);
+  im.addEventListener("load", ()=>document.body.appendChild(ov));
+})();
 })();
 </script>
 </body>
