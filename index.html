@@ -421,7 +421,7 @@ td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 <main id="app" aria-live="polite"></main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="data.js?v=65477f5e"></script>
+<script src="data.js?v=20a3b304"></script>
 <script>
 (function(){
 "use strict";
@@ -1209,7 +1209,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-11-09a";
+const APP_V = "2026-11-12a";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
