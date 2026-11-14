@@ -1209,7 +1209,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-11-12a";
+const APP_V = "2026-11-14b";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
@@ -2125,11 +2125,11 @@ const NOTICE = { id:"2026-11-08-pause", img:"notice.png", alt:"공지: 11월 8�
   ov.addEventListener("click", close);
   im.addEventListener("load", ()=>document.body.appendChild(ov));
 })();
-/* 사이트 닫기 — CLOSED=true 면 닫을 수 없는 공지 이미지가 화면 전체를 덮음(학생 입장·퀴즈 불가). 강사 화면(#teacher)은 그대로 열림.
+/* 사이트 닫기 — CLOSED=true 면 닫을 수 없는 공지 이미지가 화면 전체를 덮음(혼자 연습 불가). 수업 QR로 들어온 수업 모드(퇴실 퀴즈)는 열려 있음. 강사 화면(#teacher)은 그대로 열림.
    다시 열 땐 CLOSED=false 로 바꾸고 APP_V 를 올릴 것. */
 const CLOSED = true;
 (function(){
-  if(!CLOSED || location.hash==="#teacher") return;
+  if(!CLOSED || location.hash==="#teacher" || mode==="class") return;   // 수업 QR(set=)로 들어온 수업 모드(오늘 받은 세트 포함)는 열어 둠 — 혼자 연습만 막음 (2026-11-14)
   const ov = document.createElement("div");
   ov.setAttribute("role","dialog"); ov.setAttribute("aria-modal","true");
   ov.style.cssText="position:fixed;inset:0;z-index:10000;background:#2b2150;display:flex;align-items:center;justify-content:center;padding:16px";
