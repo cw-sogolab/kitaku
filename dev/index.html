@@ -1197,6 +1197,10 @@ let who = {raw:"", busy:false, err:"", found:null, fails:0, lockUntil:0};
 const SID_RE = /^[A-HJ-NP-Z]{2}\d{6}$/;   // 영문 2자(I·O 빼고) + 숫자 6자리, 예: KM482913
 const sidNorm = v => String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);
 const luhnOk = s => { if(!SID_RE.test(s)) return false; const ds=[...s].map(c=>/\d/.test(c)? c : String(c.charCodeAt(0)-55)).join(""); let t=0; [...ds].reverse().forEach((ch,i)=>{ let d=+ch; if(i%2){ d*=2; if(d>9) d-=9; } t+=d; }); return t%10===0; };   // 끝자리 확인숫자(영문은 A=10…Z=35로 바꿔 Luhn)
+// 스토어 사이트에서 넘어온 번호(#sid=번호): 주소 조각은 서버로 가지 않음. 바로 지우고 확인
+{ const hm=/[#&]sid=([A-Za-z0-9 -]{6,12})/.exec(location.hash);
+  if(hm){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
+    const v=sidNorm(hm[1]); if(AUTH && !me && luhnOk(v)){ who.raw=v; window.addEventListener("load",()=>setTimeout(()=>{ if(!me && (view==="entry"||view==="practice")) whoLookup(); },0)); } } }
 const isGuest = () => AUTH && !!(me && me.guest);
 const isMember = () => AUTH && !!(me && me.id);
 const guestOk = id => CONFIG.guestSets.includes(id);
@@ -1209,7 +1213,7 @@ let clockTimer = null, advTimer = null, lockTimer = null;
    서버의 index.html 속 APP_V 가 지금 화면의 APP_V 와 다르면 새 버전이 나온 것.
    첫 화면(수업 입장·혼자 연습)에 있으면 바로 새로고침, 퀴즈·퇴실증·결과·랭킹·강사 화면이면 첫 화면으로 돌아갈 때 새로고침.
    확인 시점: 화면 켤 때(탭으로 돌아올 때) + 열어 둔 동안 5분마다. 배포할 때마다 APP_V 를 바꿀 것. */
-const APP_V = "2026-11-12a";
+const APP_V = "2026-11-14a";
 let newV = null;
 const safeView = v => v==="entry" || v==="practice";
 function reloadNew(){
